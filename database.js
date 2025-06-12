@@ -222,13 +222,33 @@ if (isProduction && databaseUrl) {
 }
 
 
-// ============= FUNCIÓN PRINCIPAL DE INICIALIZACIÓN =============
+// ============= FUNCIÓN PRINCIPAL DE INICIALIZACIÓN CON DEBUGGING =============
 function initializeDatabase() {
     console.log('🔄 Inicializando base de datos...');
+    console.log('🔍 isProduction:', isProduction);
 
-    // 1. Tabla de usuarios (PRIMERA - base fundamental)
-    const createUsersQuery = isProduction ? `
-        CREATE TABLE IF NOT EXISTS users (
+    // Función helper para ejecutar queries con debugging
+    function executeQuery(queryName, query, callback) {
+        console.log(`🔧 Ejecutando ${queryName}...`);
+        console.log(`📝 Query: ${query.substring(0, 100)}...`);
+        
+        db.run(query, (err) => {
+            if (err) {
+                console.error(`❌ ERROR en ${queryName}:`, {
+                    message: err.message,
+                    code: err.code,
+                    detail: err.detail
+                });
+            } else {
+                console.log(`✅ ${queryName} exitosa`);
+            }
+            if (callback) callback(err);
+        });
+    }
+
+    // 1. Tabla de usuarios - SIMPLIFICADA para PostgreSQL
+    const createUsersQuery = isProduction ? 
+        `CREATE TABLE IF NOT EXISTS users (
             id SERIAL PRIMARY KEY,
             name TEXT NOT NULL,
             email TEXT UNIQUE NOT NULL,
@@ -237,9 +257,8 @@ function initializeDatabase() {
             is_admin BOOLEAN DEFAULT false,
             created_at TIMESTAMP DEFAULT NOW(),
             updated_at TIMESTAMP DEFAULT NOW()
-        )
-    ` : `
-        CREATE TABLE IF NOT EXISTS users (
+        )` :
+        `CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
             email TEXT UNIQUE NOT NULL,
@@ -248,48 +267,37 @@ function initializeDatabase() {
             is_admin BOOLEAN DEFAULT 0,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
-    `;
+        )`;
 
-    db.run(createUsersQuery, (err) => {
-        if (err) {
-            console.error('❌ Error creando tabla users:', err.message);
-        } else {
-            console.log('📋 Tabla users lista');
+    executeQuery('CREATE TABLE users', createUsersQuery, (err) => {
+        if (!err) {
+            console.log('👤 Procediendo a crear usuario admin...');
             createAdminUser();
         }
     });
 
     // 2. Tabla de equipos
-    const createTeamsQuery = isProduction ? `
-        CREATE TABLE IF NOT EXISTS teams (
+    const createTeamsQuery = isProduction ?
+        `CREATE TABLE IF NOT EXISTS teams (
             id SERIAL PRIMARY KEY,
             name TEXT NOT NULL,
             country TEXT,
             logo_url TEXT,
             created_at TIMESTAMP DEFAULT NOW()
-        )
-    ` : `
-        CREATE TABLE IF NOT EXISTS teams (
+        )` :
+        `CREATE TABLE IF NOT EXISTS teams (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
             country TEXT,
             logo_url TEXT,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
-    `;
+        )`;
 
-    db.run(createTeamsQuery, (err) => {
-        if (err) {
-            console.error('❌ Error creando tabla teams:', err.message);
-        } else {
-            console.log('📋 Tabla teams lista');
-        }
-    });
+    executeQuery('CREATE TABLE teams', createTeamsQuery);
 
     // 3. Tabla de torneos
-    const createTournamentsQuery = isProduction ? `
-        CREATE TABLE IF NOT EXISTS tournaments (
+    const createTournamentsQuery = isProduction ?
+        `CREATE TABLE IF NOT EXISTS tournaments (
             id SERIAL PRIMARY KEY,
             name TEXT NOT NULL,
             start_date TIMESTAMP,
@@ -298,9 +306,8 @@ function initializeDatabase() {
             description TEXT DEFAULT '',
             created_at TIMESTAMP DEFAULT NOW(),
             updated_at TIMESTAMP DEFAULT NOW()
-        )
-    ` : `
-        CREATE TABLE IF NOT EXISTS tournaments (
+        )` :
+        `CREATE TABLE IF NOT EXISTS tournaments (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
             start_date DATETIME,
@@ -309,20 +316,13 @@ function initializeDatabase() {
             description TEXT DEFAULT '',
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
-    `;
+        )`;
 
-    db.run(createTournamentsQuery, (err) => {
-        if (err) {
-            console.error('❌ Error creando tabla tournaments:', err.message);
-        } else {
-            console.log('📋 Tabla tournaments lista');
-        }
-    });
+    executeQuery('CREATE TABLE tournaments', createTournamentsQuery);
 
-    // 4. Tabla de fases del torneo
-    const createPhasesQuery = isProduction ? `
-        CREATE TABLE IF NOT EXISTS tournament_phases (
+    // 4. Tabla de fases - SIN FOREIGN KEYS para evitar problemas
+    const createPhasesQuery = isProduction ?
+        `CREATE TABLE IF NOT EXISTS tournament_phases (
             id SERIAL PRIMARY KEY,
             tournament_id INTEGER NOT NULL,
             name TEXT NOT NULL,
@@ -337,9 +337,8 @@ function initializeDatabase() {
             top_scorer_points INTEGER DEFAULT 0,
             created_at TIMESTAMP DEFAULT NOW(),
             updated_at TIMESTAMP DEFAULT NOW()
-        )
-    ` : `
-        CREATE TABLE IF NOT EXISTS tournament_phases (
+        )` :
+        `CREATE TABLE IF NOT EXISTS tournament_phases (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             tournament_id INTEGER NOT NULL,
             name TEXT NOT NULL,
@@ -353,22 +352,14 @@ function initializeDatabase() {
             winner_points INTEGER DEFAULT 0,
             top_scorer_points INTEGER DEFAULT 0,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (tournament_id) REFERENCES tournaments (id)
-        )
-    `;
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )`;
 
-    db.run(createPhasesQuery, (err) => {
-        if (err) {
-            console.error('❌ Error creando tabla tournament_phases:', err.message);
-        } else {
-            console.log('📋 Tabla tournament_phases lista');
-        }
-    });
+    executeQuery('CREATE TABLE tournament_phases', createPhasesQuery);
 
-    // 5. Tabla de partidos (nueva versión)
-    const createMatchesNewQuery = isProduction ? `
-        CREATE TABLE IF NOT EXISTS matches_new (
+    // 5. Tabla de partidos - SIMPLIFICADA
+    const createMatchesNewQuery = isProduction ?
+        `CREATE TABLE IF NOT EXISTS matches_new (
             id TEXT PRIMARY KEY,
             tournament_id INTEGER,
             phase_id INTEGER,
@@ -380,14 +371,13 @@ function initializeDatabase() {
             home_score INTEGER,
             away_score INTEGER,
             status TEXT DEFAULT 'scheduled',
-            penalty_winner TEXT DEFAULT NULL,
+            penalty_winner TEXT,
             external_match_id TEXT,
             api_source TEXT,
             created_at TIMESTAMP DEFAULT NOW(),
             updated_at TIMESTAMP DEFAULT NOW()
-        )
-    ` : `
-        CREATE TABLE IF NOT EXISTS matches_new (
+        )` :
+        `CREATE TABLE IF NOT EXISTS matches_new (
             id TEXT PRIMARY KEY,
             tournament_id INTEGER,
             phase_id INTEGER,
@@ -402,152 +392,59 @@ function initializeDatabase() {
             penalty_winner TEXT DEFAULT NULL,
             external_match_id TEXT,
             api_source TEXT,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (tournament_id) REFERENCES tournaments (id),
-            FOREIGN KEY (phase_id) REFERENCES tournament_phases (id),
-            FOREIGN KEY (home_team_id) REFERENCES teams (id),
-            FOREIGN KEY (away_team_id) REFERENCES teams (id)
-        )
-    `;
-
-    db.run(createMatchesNewQuery, (err) => {
-        if (err) {
-            console.error('❌ Error creando tabla matches_new:', err.message);
-        } else {
-            console.log('📋 Tabla matches_new lista');
-        }
-    });
-
-    // 6. Tabla de predicciones (nueva versión)
-    const createPredictionsNewQuery = isProduction ? `
-        CREATE TABLE IF NOT EXISTS predictions_new (
-            id SERIAL PRIMARY KEY,
-            user_id INTEGER NOT NULL,
-            match_id TEXT NOT NULL,
-            predicted_winner TEXT,
-            predicted_home_score INTEGER,
-            predicted_away_score INTEGER,
-            penalty_prediction TEXT DEFAULT NULL,
-            points_earned INTEGER DEFAULT 0,
-            result_points INTEGER DEFAULT 0,
-            score_points INTEGER DEFAULT 0,
-            created_at TIMESTAMP DEFAULT NOW(),
-            updated_at TIMESTAMP DEFAULT NOW(),
-            UNIQUE(user_id, match_id)
-        )
-    ` : `
-        CREATE TABLE IF NOT EXISTS predictions_new (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
-            match_id TEXT NOT NULL,
-            predicted_winner TEXT,
-            predicted_home_score INTEGER,
-            predicted_away_score INTEGER,
-            penalty_prediction TEXT DEFAULT NULL,
-            points_earned INTEGER DEFAULT 0,
-            result_points INTEGER DEFAULT 0,
-            score_points INTEGER DEFAULT 0,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users (id),
-            FOREIGN KEY (match_id) REFERENCES matches_new (id),
-            UNIQUE(user_id, match_id)
-        )
-    `;
-
-    db.run(createPredictionsNewQuery, (err) => {
-        if (err) {
-            console.error('❌ Error creando tabla predictions_new:', err.message);
-        } else {
-            console.log('📋 Tabla predictions_new lista');
-        }
-    });
-
-    // 7. Tabla de partidos legacy (mantener por compatibilidad)
-    const createMatchesLegacyQuery = isProduction ? `
-        CREATE TABLE IF NOT EXISTS matches (
-            id TEXT PRIMARY KEY,
-            home_team TEXT NOT NULL,
-            away_team TEXT NOT NULL,
-            match_date TIMESTAMP NOT NULL,
-            home_score INTEGER,
-            away_score INTEGER,
-            status TEXT DEFAULT 'scheduled',
-            competition TEXT DEFAULT 'World Cup',
-            round TEXT,
-            created_at TIMESTAMP DEFAULT NOW(),
-            updated_at TIMESTAMP DEFAULT NOW()
-        )
-    ` : `
-        CREATE TABLE IF NOT EXISTS matches (
-            id TEXT PRIMARY KEY,
-            home_team TEXT NOT NULL,
-            away_team TEXT NOT NULL,
-            match_date DATETIME NOT NULL,
-            home_score INTEGER,
-            away_score INTEGER,
-            status TEXT DEFAULT 'scheduled',
-            competition TEXT DEFAULT 'World Cup',
-            round TEXT,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
-    `;
+        )`;
 
-    db.run(createMatchesLegacyQuery, (err) => {
-        if (err) {
-            console.error('❌ Error creando tabla matches legacy:', err.message);
-        } else {
-            console.log('📋 Tabla matches legacy lista');
-        }
-    });
+    executeQuery('CREATE TABLE matches_new', createMatchesNewQuery);
 
-    // 8. Tabla de predicciones legacy (mantener por compatibilidad)
-    const createPredictionsLegacyQuery = isProduction ? `
-        CREATE TABLE IF NOT EXISTS predictions (
+    // 6. Tabla de predicciones - SIMPLIFICADA
+    const createPredictionsNewQuery = isProduction ?
+        `CREATE TABLE IF NOT EXISTS predictions_new (
             id SERIAL PRIMARY KEY,
             user_id INTEGER NOT NULL,
             match_id TEXT NOT NULL,
-            home_score INTEGER,
-            away_score INTEGER,
-            winner TEXT,
-            points INTEGER DEFAULT 0,
+            predicted_winner TEXT,
+            predicted_home_score INTEGER,
+            predicted_away_score INTEGER,
+            penalty_prediction TEXT,
+            points_earned INTEGER DEFAULT 0,
+            result_points INTEGER DEFAULT 0,
+            score_points INTEGER DEFAULT 0,
             created_at TIMESTAMP DEFAULT NOW(),
-            updated_at TIMESTAMP DEFAULT NOW(),
-            UNIQUE(user_id, match_id)
-        )
-    ` : `
-        CREATE TABLE IF NOT EXISTS predictions (
+            updated_at TIMESTAMP DEFAULT NOW()
+        )` :
+        `CREATE TABLE IF NOT EXISTS predictions_new (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER NOT NULL,
             match_id TEXT NOT NULL,
-            home_score INTEGER,
-            away_score INTEGER,
-            winner TEXT,
-            points INTEGER DEFAULT 0,
+            predicted_winner TEXT,
+            predicted_home_score INTEGER,
+            predicted_away_score INTEGER,
+            penalty_prediction TEXT DEFAULT NULL,
+            points_earned INTEGER DEFAULT 0,
+            result_points INTEGER DEFAULT 0,
+            score_points INTEGER DEFAULT 0,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users (id),
-            UNIQUE(user_id, match_id)
-        )
-    `;
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )`;
 
-    db.run(createPredictionsLegacyQuery, (err) => {
-        if (err) {
-            console.error('❌ Error creando tabla predictions legacy:', err.message);
-        } else {
-            console.log('📋 Tabla predictions legacy lista');
-        }
-    });
+    executeQuery('CREATE TABLE predictions_new', createPredictionsNewQuery);
 
-    // Ejecutar funciones de inicialización después de crear todas las tablas
+    // Ejecutar funciones de inicialización después
     setTimeout(() => {
-        console.log('🔄 Ejecutando funciones de inicialización...');
-        createSampleData();
-        migrateExistingData();
-    }, 3000); // Aumentar tiempo para PostgreSQL
+        console.log('⏰ Ejecutando funciones de inicialización...');
+        // Solo verificar si las tablas se crearon correctamente
+        db.get('SELECT COUNT(*) as count FROM users', [], (err, result) => {
+            if (err) {
+                console.error('❌ Error verificando tabla users:', err.message);
+            } else {
+                console.log('✅ Tabla users verificada, usuarios:', result);
+            }
+        });
+    }, 5000);
 }
+
 
 // ============= CREAR USUARIO ADMINISTRADOR ============= 
 // (Esta función mantenerla exactamente igual - no cambies nada)
