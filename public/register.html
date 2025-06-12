@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registro - Polla Mundialista 2026</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@100..900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🏆 Polla Mundialista 2026</h1>
+            <p>Únete a la competencia</p>
+        </header>
+
+        <main>
+            <div class="auth-container">
+                <h2>Crear Cuenta</h2>
+                <p class="auth-subtitle">Regístrate para participar en la polla mundialista</p>
+
+                <form id="registerForm" class="auth-form">
+                    <div class="form-group">
+                        <label for="name">Nombre Completo</label>
+                        <input 
+                            type="text" 
+                            id="name" 
+                            name="name" 
+                            required 
+                            placeholder="Tu nombre completo"
+                            minlength="2"
+                        >
+                    </div>
+
+                    <div class="form-group">
+                        <label for="email">Email</label>
+                        <input 
+                            type="email" 
+                            id="email" 
+                            name="email" 
+                            required 
+                            placeholder="tu@email.com"
+                        >
+                    </div>
+
+                    <div class="form-group">
+                        <label for="password">Contraseña</label>
+                        <input 
+                            type="password" 
+                            id="password" 
+                            name="password" 
+                            required 
+                            placeholder="Mínimo 6 caracteres"
+                            minlength="6"
+                        >
+                    </div>
+
+                    <div class="form-group">
+                        <label for="confirmPassword">Confirmar Contraseña</label>
+                        <input 
+                            type="password" 
+                            id="confirmPassword" 
+                            name="confirmPassword" 
+                            required 
+                            placeholder="Repite tu contraseña"
+                        >
+                    </div>
+
+                    <button type="submit" class="btn btn-primary btn-full">
+                        Crear Cuenta
+                    </button>
+                </form>
+
+                <div class="auth-links">
+                    <p>¿Ya tienes cuenta? <a href="login.html">Iniciar Sesión</a></p>
+                    <p><a href="index.html">← Volver al inicio</a></p>
+                </div>
+
+                <div id="message" class="message"></div>
+            </div>
+        </main>
+
+        <footer>
+            <p>&copy; 2026 Polla Mundialista - Hecho con ❤️ por la familia Linares❤️</p>
+        </footer>
+    </div>
+
+    <script src="auth.js"></script>
+</body>
+</html>

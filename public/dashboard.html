@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mi Dashboard - Polla Mundialista 2026</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@100..900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🏆 Mi Quiniela</h1>
+            <div class="user-info">
+                <span id="userName">Cargando...</span>
+                <button class="btn btn-secondary" onclick="logout()">Cerrar Sesión</button>
+            </div>
+        </header>
+
+        <main>
+            <div id="accountStatus" class="status-banner"></div>
+
+            <!-- Información del Torneo Activo -->
+            <div class="dashboard-card full-width tournament-info">
+                <div id="activeTournamentInfo">
+                    <p>Cargando información del torneo...</p>
+                </div>
+            </div>
+
+
+            <div class="dashboard-grid">
+                <!-- Mis Puntos -->
+                <div class="dashboard-card">
+                    <h3>🎯 Mis Puntos</h3>
+                    <div class="points-display">
+                        <span class="points-number" id="userPoints">0</span>
+                        <span class="points-label">puntos totales</span>
+                    </div>
+                </div>
+
+                <!-- Posición en la Tabla -->
+                <div class="dashboard-card">
+                    <h3>🏅 Mi Posición</h3>
+                    <div class="position-display">
+                        <span class="position-number" id="userPosition">#-</span>
+                        <span class="position-label">de <span id="totalParticipants">0</span></span>
+                    </div>
+                </div>
+
+                <!-- Tabla de Posiciones -->
+                <div class="dashboard-card full-width">
+                    <div class="leaderboard-header">
+                        <h3>🏆 Tabla de Posiciones</h3>
+                        <button class="btn btn-secondary btn-small" onclick="loadLeaderboard()">
+                            🔄 Actualizar
+                        </button>
+                    </div>
+                    <div id="leaderboardTable">
+                        <p>Cargando tabla de posiciones...</p>
+                    </div>
+                    <div class="leaderboard-footer">
+                        <button class="btn btn-primary" onclick="showFullLeaderboard()">
+                            Ver Tabla Completa
+                        </button>
+                    </div>
+                </div>
+
+
+                <!-- Próximos Partidos -->
+                <div class="dashboard-card full-width">
+                    <h3>⚽ Próximos Partidos</h3>
+                    <div id="upcomingMatches">
+                        <p>Cargando partidos...</p>
+                    </div>
+                </div>
+
+                <!-- Mis Predicciones -->
+                <div class="dashboard-card full-width">
+                    <h3>📝 Mis Predicciones</h3>
+                    <div id="myPredictions">
+                        <p>Aún no has hecho predicciones</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <footer>
+            <p>&copy; 2025 Quiniela Mundial</p>
+        </footer>
+    </div>
+
+    <script src="dashboard.js"></script>
+</body>
+</html>

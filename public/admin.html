@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel de Administrador - Polla Mundialista 2026</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@100..900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>👑 Panel de Administrador</h1>
+            <div class="user-info">
+                <span id="adminName">Cargando...</span>
+                <button class="btn btn-secondary" onclick="logout()">Cerrar Sesión</button>
+            </div>
+        </header>
+
+        <main>
+            <div class="admin-tabs">
+                <button class="tab-button active" onclick="showTab('dashboard')">📊 Dashboard</button>
+                <button class="tab-button" onclick="showTab('tournaments')">🏆 Torneos</button>
+                <button class="tab-button" onclick="showTab('teams')">⚽ Equipos</button>
+                <button class="tab-button" onclick="showTab('matches')">🥅 Partidos</button>
+                <button class="tab-button" onclick="showTab('users')">👥 Usuarios</button>
+            </div>
+
+            <!-- Tab: Dashboard -->
+            <div id="dashboard-tab" class="tab-content active">
+                <div class="dashboard-grid">
+                    <!-- Estadísticas -->
+                    <div class="dashboard-card">
+                        <h3>📊 Estadísticas</h3>
+                        <div class="stats-grid">
+                            <div class="stat-item">
+                                <span class="stat-number" id="totalUsers">0</span>
+                                <span class="stat-label">Total Usuarios</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-number" id="activeUsers">0</span>
+                                <span class="stat-label">Usuarios Activos</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-number" id="pendingUsers">0</span>
+                                <span class="stat-label">Pendientes</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Usuarios Pendientes -->
+                    <div class="dashboard-card">
+                        <h3>⏳ Usuarios Pendientes de Activación</h3>
+                        <div id="pendingUsersList">
+                            <p>Cargando usuarios...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab: Torneos -->
+            <div id="tournaments-tab" class="tab-content">
+                <div class="section-header">
+                    <h3>🏆 Gestión de Torneos</h3>
+                    <button class="btn btn-primary" onclick="showCreateTournamentForm()">
+                        + Crear Torneo
+                    </button>
+                </div>
+                <div id="tournamentsList">
+                    <p>Cargando torneos...</p>
+                </div>
+            </div>
+
+            <!-- Tab: Equipos -->
+            <div id="teams-tab" class="tab-content">
+                <div class="section-header">
+                    <h3>⚽ Gestión de Equipos</h3>
+                    <button class="btn btn-primary" onclick="showCreateTeamForm()">
+                        + Crear Equipo
+                    </button>
+                </div>
+                <div id="teamsList">
+                    <p>Cargando equipos...</p>
+                </div>
+            </div>
+
+            <!-- Tab: Partidos -->
+            <div id="matches-tab" class="tab-content">
+                <div class="section-header">
+                    <h3>⚽ Gestión de Partidos</h3>
+                    <div class="header-actions">
+                        <select id="tournamentFilter" onchange="filterMatchesByTournament()">
+                            <option value="">Todos los torneos</option>
+                        </select>
+                        <button class="btn btn-primary" onclick="showCreateMatchForm()">
+                            + Crear Partido
+                        </button>
+                    </div>
+                </div>
+                <div id="matchesList">
+                    <p>Cargando partidos...</p>
+                </div>
+            </div>
+
+            <!-- Tab: Usuarios -->
+            <div id="users-tab" class="tab-content">
+                <div class="section-header">
+                    <h3>👥 Gestión de Usuarios</h3>
+                </div>
+                <div id="usersList">
+                    <p>Cargando usuarios...</p>
+                </div>
+            </div>
+        </main>
+
+        <footer>
+            <p>&copy; 2025 Polla Mundialista - Panel de Administrador</p>
+        </footer>
+    </div>
+
+    <script src="admin.js"></script>
+</body>
+</html>
