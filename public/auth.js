@@ -15,7 +15,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Función para validar registro
-    function validateRegister(name, email, password, confirmPassword, terms) {
+    function validateRegister(name, email, password, confirmPassword) {
         const errors = [];
 
         if (name.trim().length < 2) {
@@ -35,10 +35,6 @@ document.addEventListener('DOMContentLoaded', () => {
             errors.push('Las contraseñas no coinciden');
         }
 
-        if (!terms) {
-            errors.push('Debes aceptar los términos y condiciones');
-        }
-
         return errors;
     }
 
@@ -56,7 +52,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const password = document.getElementById('password').value;
             const confirmPassword = document.getElementById('confirmPassword').value;
 
-            const validationErrors = validateRegister(name, email, password, confirmPassword, terms);
+            const validationErrors = validateRegister(name, email, password, confirmPassword);
 
             if (validationErrors.length > 0) {
                 showMessage(validationErrors.join(', '), 'error');
