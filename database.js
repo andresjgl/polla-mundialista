@@ -185,15 +185,20 @@ if (isProduction && databaseUrl) {
     
     console.log('✅ PostgreSQL configurado exitosamente');
     
-    // Test de conexión con debugging
-    try {
-        console.log('🧪 Probando conexión...');
-        const testResult = await pool.query('SELECT NOW() as current_time');
-        console.log('✅ Test de conexión exitoso:', testResult?.rows?.[0]);
-        initializeDatabase();
-    } catch (error) {
-        console.error('❌ Error en test de conexión:', error);
-    }
+   // Test de conexión con debugging (versión corregida)
+    console.log('🧪 Probando conexión...');
+    pool.query('SELECT NOW() as current_time')
+        .then(testResult => {
+            console.log('✅ Test de conexión exitoso:', testResult?.rows?.[0]);
+            console.log('🔄 Iniciando base de datos...');
+            initializeDatabase();
+        })
+        .catch(error => {
+            console.error('❌ Error en test de conexión:', error);
+            // Intentar inicializar de todos modos
+            initializeDatabase();
+        });
+
 
     
     console.log('✅ PostgreSQL configurado exitosamente');
