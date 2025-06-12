@@ -1,112 +1,123 @@
-// database.js - Configuración de base de datos MULTI-ENTORNO CORREGIDA
+// database.js - Configuración FORZADA para Vercel
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const bcrypt = require('bcryptjs');
 
-// Configuración de base de datos según entorno
-const isProduction = process.env.NODE_ENV === 'production';
+// DETECCIÓN FORZADA DE PRODUCCIÓN
+const isVercel = !!process.env.VERCEL || !!process.env.VERCEL_ENV;
+const isProduction = process.env.NODE_ENV === 'production' || isVercel;
 const databaseUrl = process.env.DATABASE_URL;
+
+// LOGS DE DEBUG
+console.log('🔍 DEBUG - Detección de entorno:');
+console.log('   NODE_ENV:', process.env.NODE_ENV);
+console.log('   VERCEL:', process.env.VERCEL);
+console.log('   VERCEL_ENV:', process.env.VERCEL_ENV);
+console.log('   isVercel:', isVercel);
+console.log('   isProduction:', isProduction);
+console.log('   DATABASE_URL presente:', !!databaseUrl);
+console.log('   DATABASE_URL empieza con postgresql:', databaseUrl?.startsWith('postgresql'));
 
 let db;
 
-if (isProduction && databaseUrl) {
-    // Configuración para producción (PostgreSQL/Supabase)
-    console.log('🌍 Configurando base de datos para producción...');
+// FORZAR POSTGRESQL EN VERCEL
+if (isVercel || (isProduction && databaseUrl)) {
+    console.log('🌍 FORZANDO PostgreSQL para Vercel/Producción...');
     
-    // Importar pg solo cuando sea necesario
-    const { Pool } = require('pg');
-    
-    // Crear pool de conexiones PostgreSQL
-    const pool = new Pool({
-        connectionString: databaseUrl,
-        ssl: {
-            rejectUnauthorized: false
-        }
-    });
-    
-    db = {
-        // Wrapper para hacer compatible con sqlite3
-        run: async (query, params = [], callback) => {
-            try {
-                // Convertir ? a $1, $2, etc. para PostgreSQL
-                let pgQuery = query;
-                let pgParams = params;
-                
-                if (Array.isArray(params) && params.length > 0) {
-                    let paramIndex = 1;
-                    pgQuery = query.replace(/\?/g, () => `$${paramIndex++}`);
-                    pgParams = params;
-                }
-                
-                const result = await pool.query(pgQuery, pgParams);
-                if (callback) callback(null, result);
-                return result;
-            } catch (error) {
-                console.error('Error en query:', error);
-                if (callback) callback(error);
-                throw error;
-            }
-        },
+    try {
+        const { Pool } = require('pg');
         
-        get: async (query, params = [], callback) => {
-            try {
-                // Convertir ? a $1, $2, etc. para PostgreSQL
-                let pgQuery = query;
-                let pgParams = params;
-                
-                if (Array.isArray(params) && params.length > 0) {
-                    let paramIndex = 1;
-                    pgQuery = query.replace(/\?/g, () => `$${paramIndex++}`);
-                    pgParams = params;
-                }
-                
-                const result = await pool.query(pgQuery, pgParams);
-                const row = result.rows[0] || null;
-                if (callback) callback(null, row);
-                return row;
-            } catch (error) {
-                console.error('Error en query:', error);
-                if (callback) callback(error);
-                throw error;
+        const pool = new Pool({
+            connectionString: databaseUrl,
+            ssl: {
+                rejectUnauthorized: false
             }
-        },
+        });
         
-        all: async (query, params = [], callback) => {
-            try {
-                // Convertir ? a $1, $2, etc. para PostgreSQL
-                let pgQuery = query;
-                let pgParams = params;
-                
-                if (Array.isArray(params) && params.length > 0) {
-                    let paramIndex = 1;
-                    pgQuery = query.replace(/\?/g, () => `$${paramIndex++}`);
-                    pgParams = params;
+        db = {
+            run: async (query, params = [], callback) => {
+                try {
+                    let pgQuery = query;
+                    let pgParams = params;
+                    
+                    if (Array.isArray(params) && params.length > 0) {
+                        let paramIndex = 1;
+                        pgQuery = query.replace(/\?/g, () => `$${paramIndex++}`);
+                        pgParams = params;
+                    }
+                    
+                    const result = await pool.query(pgQuery, pgParams);
+                    if (callback) callback(null, result);
+                    return result;
+                } catch (error) {
+                    console.error('❌ Error en PostgreSQL query:', error);
+                    if (callback) callback(error);
+                    throw error;
                 }
-                
-                const result = await pool.query(pgQuery, pgParams);
-                if (callback) callback(null, result.rows);
-                return result.rows;
-            } catch (error) {
-                console.error('Error en query:', error);
-                if (callback) callback(error);
-                throw error;
+            },
+            
+            get: async (query, params = [], callback) => {
+                try {
+                    let pgQuery = query;
+                    let pgParams = params;
+                    
+                    if (Array.isArray(params) && params.length > 0) {
+                        let paramIndex = 1;
+                        pgQuery = query.replace(/\?/g, () => `$${paramIndex++}`);
+                        pgParams = params;
+                    }
+                    
+                    const result = await pool.query(pgQuery, pgParams);
+                    const row = result.rows[0] || null;
+                    if (callback) callback(null, row);
+                    return row;
+                } catch (error) {
+                    console.error('❌ Error en PostgreSQL query:', error);
+                    if (callback) callback(error);
+                    throw error;
+                }
+            },
+            
+            all: async (query, params = [], callback) => {
+                try {
+                    let pgQuery = query;
+                    let pgParams = params;
+                    
+                    if (Array.isArray(params) && params.length > 0) {
+                        let paramIndex = 1;
+                        pgQuery = query.replace(/\?/g, () => `$${paramIndex++}`);
+                        pgParams = params;
+                    }
+                    
+                    const result = await pool.query(pgQuery, pgParams);
+                    if (callback) callback(null, result.rows);
+                    return result.rows;
+                } catch (error) {
+                    console.error('❌ Error en PostgreSQL query:', error);
+                    if (callback) callback(error);
+                    throw error;
+                }
             }
-        }
-    };
-    
-    console.log('✅ Base de datos PostgreSQL configurada');
-    initializeDatabase();
+        };
+        
+        console.log('✅ PostgreSQL configurado exitosamente para producción');
+        initializeDatabase();
+        
+    } catch (error) {
+        console.error('❌ Error configurando PostgreSQL:', error);
+        throw error;
+    }
     
 } else {
     // Configuración para desarrollo (SQLite)
-    console.log('🔧 Configurando base de datos para desarrollo...');
+    console.log('🔧 Configurando SQLite para desarrollo...');
     
     const dbPath = path.join(__dirname, 'data', 'quiniela.db');
     db = new sqlite3.Database(dbPath, (err) => {
         if (err) {
-            console.error('❌ Error al conectar con la base de datos:', err.message);
+            console.error('❌ Error al conectar con SQLite:', err.message);
         } else {
-            console.log('✅ Conectado a la base de datos SQLite');
+            console.log('✅ Conectado a SQLite para desarrollo');
             initializeDatabase();
         }
     });
