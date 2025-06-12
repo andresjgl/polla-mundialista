@@ -55,7 +55,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
             const confirmPassword = document.getElementById('confirmPassword').value;
-            const terms = document.getElementById('terms').checked;
 
             const validationErrors = validateRegister(name, email, password, confirmPassword, terms);
 
