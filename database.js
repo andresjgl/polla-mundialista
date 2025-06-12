@@ -18,7 +18,6 @@ console.log('   DATABASE_URL presente:', !!databaseUrl);
 let db;
 
 if (isProduction && databaseUrl) {
-    // SOLO aquí hacemos require de pg
     console.log('🌍 Configurando PostgreSQL para producción...');
     
     const { Pool } = require('pg');
@@ -27,11 +26,17 @@ if (isProduction && databaseUrl) {
         connectionString: databaseUrl,
         ssl: {
             rejectUnauthorized: false
-        }
+        },
+        max: 1,
+        idleTimeoutMillis: 30000,
+        connectionTimeoutMillis: 2000,
     });
     
     db = {
         run: async (query, params = [], callback) => {
+            console.log('🔧 [RUN] Query original:', query);
+            console.log('🔧 [RUN] Params originales:', params);
+            
             try {
                 let pgQuery = query;
                 let pgParams = params;
@@ -42,17 +47,42 @@ if (isProduction && databaseUrl) {
                     pgParams = params;
                 }
                 
+                console.log('🔧 [RUN] Query PostgreSQL:', pgQuery);
+                console.log('🔧 [RUN] Params PostgreSQL:', pgParams);
+                
                 const result = await pool.query(pgQuery, pgParams);
-                if (callback) callback(null, result);
-                return result;
+                
+                console.log('✅ [RUN] Resultado exitoso:', {
+                    rowCount: result?.rowCount,
+                    hasRows: !!result?.rows,
+                    rowsLength: result?.rows?.length
+                });
+                
+                const response = { 
+                    lastID: result?.insertId || result?.rows?.[0]?.id,
+                    changes: result?.rowCount || 0 
+                };
+                
+                if (callback) callback(null, response);
+                return response;
+                
             } catch (error) {
-                console.error('❌ Error en PostgreSQL query:', error);
+                console.error('❌ [RUN] Error completo:', {
+                    message: error.message,
+                    code: error.code,
+                    detail: error.detail,
+                    query: query,
+                    params: params
+                });
                 if (callback) callback(error);
                 throw error;
             }
         },
         
         get: async (query, params = [], callback) => {
+            console.log('🔍 [GET] Query original:', query);
+            console.log('🔍 [GET] Params originales:', params);
+            
             try {
                 let pgQuery = query;
                 let pgParams = params;
@@ -63,18 +93,48 @@ if (isProduction && databaseUrl) {
                     pgParams = params;
                 }
                 
+                console.log('🔍 [GET] Query PostgreSQL:', pgQuery);
+                console.log('🔍 [GET] Params PostgreSQL:', pgParams);
+                
                 const result = await pool.query(pgQuery, pgParams);
-                const row = result.rows[0] || null;
+                
+                console.log('🔍 [GET] Resultado bruto:', {
+                    isUndefined: result === undefined,
+                    isNull: result === null,
+                    hasRows: !!result?.rows,
+                    rowsLength: result?.rows?.length,
+                    firstRow: result?.rows?.[0]
+                });
+                
+                if (!result) {
+                    console.error('❌ [GET] Result es undefined/null');
+                    if (callback) callback(null, null);
+                    return null;
+                }
+                
+                const row = result.rows?.[0] || null;
+                console.log('✅ [GET] Row final:', row);
+                
                 if (callback) callback(null, row);
                 return row;
+                
             } catch (error) {
-                console.error('❌ Error en PostgreSQL query:', error);
+                console.error('❌ [GET] Error completo:', {
+                    message: error.message,
+                    code: error.code,
+                    detail: error.detail,
+                    query: query,
+                    params: params
+                });
                 if (callback) callback(error);
-                throw error;
+                return null;
             }
         },
         
         all: async (query, params = [], callback) => {
+            console.log('📋 [ALL] Query original:', query);
+            console.log('📋 [ALL] Params originales:', params);
+            
             try {
                 let pgQuery = query;
                 let pgParams = params;
@@ -85,16 +145,56 @@ if (isProduction && databaseUrl) {
                     pgParams = params;
                 }
                 
+                console.log('📋 [ALL] Query PostgreSQL:', pgQuery);
+                console.log('📋 [ALL] Params PostgreSQL:', pgParams);
+                
                 const result = await pool.query(pgQuery, pgParams);
-                if (callback) callback(null, result.rows);
-                return result.rows;
+                
+                console.log('📋 [ALL] Resultado bruto:', {
+                    isUndefined: result === undefined,
+                    isNull: result === null,
+                    hasRows: !!result?.rows,
+                    rowsLength: result?.rows?.length
+                });
+                
+                if (!result) {
+                    console.error('❌ [ALL] Result es undefined/null');
+                    if (callback) callback(null, []);
+                    return [];
+                }
+                
+                const rows = result.rows || [];
+                console.log('✅ [ALL] Rows finales:', rows.length, 'filas');
+                
+                if (callback) callback(null, rows);
+                return rows;
+                
             } catch (error) {
-                console.error('❌ Error en PostgreSQL query:', error);
+                console.error('❌ [ALL] Error completo:', {
+                    message: error.message,
+                    code: error.code,
+                    detail: error.detail,
+                    query: query,
+                    params: params
+                });
                 if (callback) callback(error);
-                throw error;
+                return [];
             }
         }
     };
+    
+    console.log('✅ PostgreSQL configurado exitosamente');
+    
+    // Test de conexión con debugging
+    try {
+        console.log('🧪 Probando conexión...');
+        const testResult = await pool.query('SELECT NOW() as current_time');
+        console.log('✅ Test de conexión exitoso:', testResult?.rows?.[0]);
+        initializeDatabase();
+    } catch (error) {
+        console.error('❌ Error en test de conexión:', error);
+    }
+
     
     console.log('✅ PostgreSQL configurado exitosamente');
     initializeDatabase();
