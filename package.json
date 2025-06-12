@@ -10,6 +10,7 @@
     "start": "node server.js",
     "dev": "node server.js",
     "build": "echo 'No build step needed'",
+    "vercel-build": "npm install --production && npm install pg",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
@@ -26,10 +27,12 @@
     "cors": "^2.8.5",
     "express": "^4.18.2",
     "jsonwebtoken": "^9.0.2",
-    "pg": "^8.16.0",
-    "sqlite3": "^5.1.6"
+    "pg": "^8.16.0"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"
+  },
+  "optionalDependencies": {
+    "sqlite3": "^5.1.6"
   }
 }
