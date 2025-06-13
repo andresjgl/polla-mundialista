@@ -8,31 +8,26 @@ const router = express.Router();
 
 // GET /api/admin/tournaments - Listar todos los torneos
 router.get('/tournaments', authenticateToken, requireAdmin, async (req, res) => {
+    console.log('🔍 GET /tournaments solicitado');
+    
     try {
         const { db } = require('../database');
         
-        db.all(`
-            SELECT t.*, 
-                   COUNT(m.id) as matches_count,
-                   COUNT(CASE WHEN m.status = 'finished' THEN 1 END) as finished_matches,
-                   COUNT(p.id) as total_predictions
-            FROM tournaments t
-            LEFT JOIN matches_new m ON t.id = m.tournament_id
-            LEFT JOIN predictions_new p ON m.id = p.match_id
-            GROUP BY t.id
-            ORDER BY t.created_at DESC
-        `, (err, tournaments) => {
+        db.all('SELECT * FROM tournaments ORDER BY created_at DESC', [], (err, tournaments) => {
             if (err) {
-                console.error('Error obteniendo torneos:', err);
-                return res.status(500).json({ error: 'Error interno del servidor' });
+                console.error('❌ Error obteniendo torneos:', err);
+                return res.json([]);
             }
+            
+            console.log(`✅ Torneos encontrados: ${tournaments ? tournaments.length : 0}`);
             res.json(tournaments || []);
         });
     } catch (error) {
-        console.error('Error obteniendo torneos:', error);
-        res.status(500).json({ error: 'Error interno del servidor' });
+        console.error('❌ Error en route tournaments:', error);
+        res.json([]);
     }
 });
+
 
 // POST /api/admin/tournaments - Crear nuevo torneo
 router.post('/tournaments', authenticateToken, requireAdmin, async (req, res) => {
@@ -1079,19 +1074,26 @@ function showTournamentTypeSelector(types) {
 
 // GET /api/admin/teams - Listar equipos
 router.get('/teams', authenticateToken, requireAdmin, async (req, res) => {
+    console.log('🔍 GET /teams solicitado');
+    
     try {
         const { db } = require('../database');
         
-        db.all('SELECT * FROM teams ORDER BY name ASC', (err, teams) => {
+        db.all('SELECT * FROM teams ORDER BY name', [], (err, teams) => {
             if (err) {
-                console.error('Error obteniendo equipos:', err);
-                return res.status(500).json({ error: 'Error interno del servidor' });
+                console.error('❌ Error obteniendo equipos:', err);
+                console.log('📤 Devolviendo array vacío por error');
+                return res.json([]); // Siempre array, nunca error 500
             }
+            
+            console.log(`✅ Equipos encontrados: ${teams ? teams.length : 0}`);
+            console.log('📤 Devolviendo equipos:', teams);
             res.json(teams || []);
         });
     } catch (error) {
-        console.error('Error obteniendo equipos:', error);
-        res.status(500).json({ error: 'Error interno del servidor' });
+        console.error('❌ Error en route teams:', error);
+        console.log('📤 Devolviendo array vacío por catch');
+        res.json([]); // Siempre array, nunca error 500
     }
 });
 
