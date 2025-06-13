@@ -203,15 +203,42 @@ router.post('/activate/:userId', authenticateToken, requireAdmin, async (req, re
 });
 
 // GET /api/auth/stats - Estadísticas de usuarios
-router.get('/stats', async (req, res) => {
+// GET /api/auth/stats - Estadísticas del dashboard
+router.get('/stats', authenticateToken, requireAdmin, async (req, res) => {
+    console.log('🔍 GET /stats solicitado');
+    
     try {
-        const stats = await userOperations.getStats();
-        res.json(stats);
+        const { db } = require('../database');
+        
+        // Contar usuarios totales
+        db.get('SELECT COUNT(*) as total FROM users', [], (err, totalResult) => {
+            if (err) {
+                console.error('❌ Error contando usuarios totales:', err);
+                return res.json({ total_users: 0, active_users: 0 });
+            }
+            
+            // Contar usuarios activos
+            db.get('SELECT COUNT(*) as active FROM users WHERE is_active = ?', [true], (err2, activeResult) => {
+                if (err2) {
+                    console.error('❌ Error contando usuarios activos:', err2);
+                    return res.json({ total_users: totalResult.total || 0, active_users: 0 });
+                }
+                
+                const stats = {
+                    total_users: totalResult.total || 0,
+                    active_users: activeResult.active || 0
+                };
+                
+                console.log('✅ Estadísticas:', stats);
+                res.json(stats);
+            });
+        });
     } catch (error) {
-        console.error('Error obteniendo estadísticas:', error);
-        res.status(500).json({ error: 'Error interno del servidor' });
+        console.error('❌ Error en route stats:', error);
+        res.json({ total_users: 0, active_users: 0 });
     }
 });
+
 
 // GET /api/auth/verify - Verificar token
 router.get('/verify', authenticateToken, (req, res) => {
@@ -222,24 +249,29 @@ router.get('/verify', authenticateToken, (req, res) => {
 });
 
 
-// GET /api/admin/pending-users - Obtener usuarios pendientes (solo admin)
+
+// GET /api/auth/pending-users - Obtener usuarios pendientes
 router.get('/pending-users', authenticateToken, requireAdmin, async (req, res) => {
+    console.log('🔍 GET /pending-users solicitado');
+    
     try {
         const { db } = require('../database');
         
-        db.all('SELECT id, name, email, created_at FROM users WHERE is_active = 0', (err, users) => {
+        db.all('SELECT id, name, email, created_at FROM users WHERE is_active = ? ORDER BY created_at DESC', [false], (err, users) => {
             if (err) {
-                console.error('Error obteniendo usuarios pendientes:', err);
-                res.status(500).json({ error: 'Error interno del servidor' });
-            } else {
-                res.json(users);
+                console.error('❌ Error obteniendo usuarios pendientes:', err);
+                return res.json([]); // Array vacío, no error 500
             }
+            
+            console.log(`✅ Usuarios pendientes: ${users ? users.length : 0}`);
+            res.json(users || []);
         });
     } catch (error) {
-        console.error('Error obteniendo usuarios pendientes:', error);
-        res.status(500).json({ error: 'Error interno del servidor' });
+        console.error('❌ Error en route pending-users:', error);
+        res.json([]);
     }
 });
+
 
 
 

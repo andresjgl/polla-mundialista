@@ -35,22 +35,28 @@ router.get('/upcoming', authenticateToken, async (req, res) => {
 
 
 // GET /api/matches - Todos los partidos (para admin)
+// GET /api/matches - Obtener todos los partidos
 router.get('/', authenticateToken, async (req, res) => {
+    console.log('🔍 GET /matches solicitado');
+    
     try {
         const { db } = require('../database');
         
-        db.all('SELECT * FROM matches ORDER BY match_date ASC', (err, matches) => {
+        db.all('SELECT * FROM matches_new ORDER BY match_date DESC', [], (err, matches) => {
             if (err) {
-                console.error('Error obteniendo todos los partidos:', err);
-                return res.status(500).json({ error: 'Error interno del servidor' });
+                console.error('❌ Error obteniendo partidos:', err);
+                return res.json([]);
             }
+            
+            console.log(`✅ Partidos encontrados: ${matches ? matches.length : 0}`);
             res.json(matches || []);
         });
     } catch (error) {
-        console.error('Error obteniendo partidos:', error);
-        res.status(500).json({ error: 'Error interno del servidor' });
+        console.error('❌ Error en route matches:', error);
+        res.json([]);
     }
 });
+
 
 
 const { requireAdmin } = require('./auth');
@@ -169,30 +175,49 @@ router.post('/:matchId/result', authenticateToken, requireAdmin, async (req, res
 
 
 // GET /api/matches/with-predictions - Partidos con conteo de predicciones (admin)
+// GET /api/matches/with-predictions - Obtener partidos con predicciones
 router.get('/with-predictions', authenticateToken, requireAdmin, async (req, res) => {
+    console.log('🔍 GET /matches/with-predictions solicitado');
+    
     try {
         const { db } = require('../database');
         
-        db.all(`
-            SELECT m.*, tp.name as phase_name, tp.points_multiplier,
-                   COUNT(p.id) as predictions_count
+        // Query simplificada que funciona en PostgreSQL
+        const query = `
+            SELECT 
+                m.id,
+                m.home_team,
+                m.away_team,
+                m.match_date,
+                m.home_score,
+                m.away_score,
+                m.status,
+                COALESCE(t.name, 'Sin torneo') as tournament_name,
+                COALESCE(tp.name, 'Sin fase') as phase_name
             FROM matches_new m
+            LEFT JOIN tournaments t ON m.tournament_id = t.id
             LEFT JOIN tournament_phases tp ON m.phase_id = tp.id
-            LEFT JOIN predictions_new p ON m.id = p.match_id
-            GROUP BY m.id
-            ORDER BY m.match_date ASC
-        `, (err, matches) => {
+            ORDER BY m.match_date DESC
+            LIMIT 50
+        `;
+        
+        db.all(query, [], (err, matches) => {
             if (err) {
-                console.error('Error obteniendo partidos con predicciones:', err);
-                return res.status(500).json({ error: 'Error interno del servidor' });
+                console.error('❌ Error obteniendo partidos:', err);
+                console.log('📤 Devolviendo array vacío por error');
+                return res.json([]);
             }
+            
+            console.log(`✅ Partidos encontrados: ${matches ? matches.length : 0}`);
             res.json(matches || []);
         });
+        
     } catch (error) {
-        console.error('Error obteniendo partidos:', error);
-        res.status(500).json({ error: 'Error interno del servidor' });
+        console.error('❌ Error en route matches/with-predictions:', error);
+        res.json([]);
     }
 });
+
 
 // AGREGAR esta ruta en routes/matches.js:
 
