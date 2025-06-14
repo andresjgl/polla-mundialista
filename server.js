@@ -27,7 +27,6 @@ app.use(express.urlencoded({ extended: true }));
 
 // Rutas de la API
 app.use('/api/auth', authRoutes);
-app.use('/api/admin', authRoutes);
 app.use('/api/matches', matchRoutes);
 app.use('/api/predictions', predictionsRoutes);
 app.use('/api/leaderboard', leaderboardRoutes);
