@@ -580,90 +580,100 @@ function getPredictionText(winner) {
 // Función para cargar tabla de posiciones (NUEVA)
 async function loadLeaderboard() {
     try {
-        const token = localStorage.getItem('token');
-        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        console.log('📊 Cargando tabla de posiciones...');
         
+        const token = localStorage.getItem('token');
         const response = await fetch('/api/leaderboard', {
             headers: {
-                'Authorization': `Bearer ${token}`
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
             }
         });
-
+        
+        console.log('📊 Response status:', response.status);
+        
+        if (response.status === 401) {
+            console.log('🔐 Token expirado');
+            localStorage.removeItem('token');
+            window.location.href = '/login.html';
+            return;
+        }
+        
         if (response.ok) {
-            const leaderboard = await response.json();
-            displayLeaderboard(leaderboard, user.id);
+            const text = await response.text();
+            console.log('📊 Response text:', text.substring(0, 100));
+            
+            // Verificar que no sea "undefined"
+            if (text === 'undefined' || text.trim() === '') {
+                console.error('❌ API devolvió undefined o vacío');
+                displayLeaderboardError('Sin datos disponibles');
+                return;
+            }
+            
+            try {
+                const leaderboard = JSON.parse(text);
+                console.log('✅ Leaderboard parseado:', leaderboard);
+                displayLeaderboard(leaderboard);
+            } catch (parseError) {
+                console.error('❌ Error parseando JSON:', parseError);
+                console.error('❌ Texto recibido:', text);
+                displayLeaderboardError('Error en formato de datos');
+            }
         } else {
-            document.getElementById('leaderboardTable').innerHTML = '<p>Error cargando tabla de posiciones</p>';
+            console.error('❌ Error en response:', response.status);
+            displayLeaderboardError('Error cargando datos');
         }
     } catch (error) {
-        console.error('Error cargando tabla de posiciones:', error);
-        document.getElementById('leaderboardTable').innerHTML = '<p>Error de conexión</p>';
+        console.error('❌ Error en loadLeaderboard:', error);
+        displayLeaderboardError('Error de conexión');
     }
 }
 
-// Función para mostrar tabla de posiciones (NUEVA)
-function displayLeaderboard(leaderboard, currentUserId) {
-    const container = document.getElementById('leaderboardTable');
-    
-    if (leaderboard.length === 0) {
+// Función para mostrar error en leaderboard
+function displayLeaderboardError(message) {
+    const container = document.getElementById('leaderboardContainer');
+    if (container) {
         container.innerHTML = `
-            <div class="no-data">
-                <p>📊 Aún no hay datos en la tabla de posiciones</p>
-                <small>Haz predicciones y espera los resultados para ver tu posición</small>
+            <div class="error-message">
+                <p>⚠️ ${message}</p>
+                <button onclick="loadLeaderboard()" class="btn btn-small">
+                    🔄 Reintentar
+                </button>
+            </div>
+        `;
+    }
+}
+
+// Función para mostrar leaderboard - VERSIÓN SEGURA
+function displayLeaderboard(leaderboard) {
+    const container = document.getElementById('leaderboardContainer');
+    
+    if (!container) {
+        console.error('❌ Container leaderboardContainer no encontrado');
+        return;
+    }
+    
+    if (!leaderboard || !Array.isArray(leaderboard) || leaderboard.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <p>👥 Aún no hay participantes en el ranking</p>
+                <small>¡Sé el primero en hacer predicciones!</small>
             </div>
         `;
         return;
     }
-
-    // Mostrar top 10 + usuario actual si no está en top 10
-    let displayData = leaderboard.slice(0, 10);
-    const currentUserInTop10 = displayData.find(user => user.id == currentUserId);
     
-    if (!currentUserInTop10 && leaderboard.length > 10) {
-        const currentUser = leaderboard.find(user => user.id == currentUserId);
-        if (currentUser) {
-            displayData.push({ ...currentUser, isCurrentUser: true });
-        }
-    }
-
-    const leaderboardHTML = `
-        <div class="leaderboard-table">
-            <div class="leaderboard-header-row">
-                <div class="pos">Pos</div>
-                <div class="name">Participante</div>
-                <div class="predictions">Predicciones</div>
-                <div class="points">Puntos</div>
-            </div>
-            ${displayData.map((user, index) => {
-                const isCurrentUser = user.id == currentUserId;
-                const isTop3 = user.position <= 3;
-                const showSeparator = user.isCurrentUser && index > 0;
-                
-                return `
-                    ${showSeparator ? '<div class="position-separator">...</div>' : ''}
-                    <div class="leaderboard-row ${isCurrentUser ? 'current-user' : ''} ${isTop3 ? 'top-three' : ''}">
-                        <div class="pos">
-                            ${user.position === 1 ? '🥇' : user.position === 2 ? '🥈' : user.position === 3 ? '🥉' : `#${user.position}`}
-                        </div>
-                        <div class="name">
-                            ${user.name}
-                            ${isCurrentUser ? '<span class="you-badge">TÚ</span>' : ''}
-                        </div>
-                        <div class="predictions">
-                            <span class="successful">${user.successful_predictions}</span>/<span class="total">${user.total_predictions}</span>
-                        </div>
-                        <div class="points">
-                            <strong>${user.total_points}</strong>
-                            <small>${user.result_points}+${user.score_points}</small>
-                        </div>
-                    </div>
-                `;
-            }).join('')}
+    const leaderboardHTML = leaderboard.map(user => `
+        <div class="leaderboard-item">
+            <span class="position">#${user.position || '?'}</span>
+            <span class="name">${user.name || 'Usuario'}</span>
+            <span class="points">${user.total_points || 0} pts</span>
         </div>
-    `;
-
+    `).join('');
+    
     container.innerHTML = leaderboardHTML;
 }
+
 
 // Función para mostrar tabla completa (NUEVA)
 function showFullLeaderboard() {
