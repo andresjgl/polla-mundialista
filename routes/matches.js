@@ -4,14 +4,40 @@ const { authenticateToken } = require('./auth');
 
 const router = express.Router();
 
-// GET /api/matches/upcoming - CORREGIDA para PostgreSQL
+// GET /api/matches/upcoming - VERSIÓN CON PAGINACIÓN Y FILTROS
 router.get('/upcoming', authenticateToken, async (req, res) => {
     console.log('🔍 GET /matches/upcoming solicitado');
     
     try {
         const { db } = require('../database');
+        const userId = req.user.id;
         
-        // CONSULTA CORREGIDA - Compatible con PostgreSQL
+        // Parámetros de consulta
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const filter = req.query.filter; // 'no-prediction' o undefined
+        const offset = (page - 1) * limit;
+        
+        console.log('📄 Parámetros:', { page, limit, filter, offset });
+
+        // Construir WHERE clause base
+        let whereClause = `
+            WHERE t.status = 'active' 
+            AND m.status = 'scheduled'
+        `;
+        
+        // Agregar filtro de predicciones si se solicita
+        if (filter === 'no-prediction') {
+            whereClause += `
+                AND m.id NOT IN (
+                    SELECT p.match_id 
+                    FROM predictions_new p 
+                    WHERE p.user_id = ${userId}
+                )
+            `;
+        }
+
+        // Consulta principal con paginación
         const query = `
             SELECT 
                 m.id,
@@ -25,41 +51,79 @@ router.get('/upcoming', authenticateToken, async (req, res) => {
                 m.phase_id,
                 COALESCE(tp.name, 'Sin fase') as phase_name,
                 COALESCE(tp.points_multiplier, 1) as points_multiplier,
-                COALESCE(tp.is_eliminatory, false) as is_eliminatory,
                 COALESCE(tp.result_points, 1) as result_points,
                 COALESCE(tp.exact_score_points, 3) as exact_score_points,
+                COALESCE(tp.is_eliminatory, false) as is_eliminatory,
                 t.name as tournament_name,
                 t.status as tournament_status
             FROM matches_new m
             LEFT JOIN tournament_phases tp ON m.phase_id = tp.id
             LEFT JOIN tournaments t ON m.tournament_id = t.id
-            WHERE t.status = 'active' 
-            AND m.status = 'scheduled'
+            ${whereClause}
             ORDER BY m.match_date ASC
-            LIMIT 20
+            LIMIT ${limit} OFFSET ${offset}
+        `;
+
+        // Consulta para contar total
+        const countQuery = `
+            SELECT COUNT(*) as total
+            FROM matches_new m
+            LEFT JOIN tournament_phases tp ON m.phase_id = tp.id
+            LEFT JOIN tournaments t ON m.tournament_id = t.id
+            ${whereClause}
         `;
         
-        console.log('🔧 Ejecutando query corregida...');
+        console.log('🔧 Ejecutando consulta paginada...');
         
-        db.all(query, [], (err, matches) => {
+        // Ejecutar ambas consultas
+        db.get(countQuery, [], (err, countResult) => {
             if (err) {
-                console.error('❌ Error obteniendo partidos próximos:', err);
-                return res.json([]); // Siempre devolver array vacío, no error
+                console.error('❌ Error contando partidos:', err);
+                return res.json({ 
+                    matches: [], 
+                    pagination: { page: 1, limit: 10, total: 0, totalPages: 0 }
+                });
             }
-            
-            console.log(`✅ Partidos próximos encontrados: ${matches ? matches.length : 0}`);
-            if (matches && matches.length > 0) {
-                console.log('📊 Primer partido:', matches[0]);
-            }
-            
-            res.json(matches || []); // Siempre array, nunca null
+
+            const total = countResult.total;
+            const totalPages = Math.ceil(total / limit);
+
+            db.all(query, [], (err, matches) => {
+                if (err) {
+                    console.error('❌ Error obteniendo partidos:', err);
+                    return res.json({ 
+                        matches: [], 
+                        pagination: { page, limit, total: 0, totalPages: 0 }
+                    });
+                }
+                
+                console.log(`✅ Partidos encontrados: ${matches ? matches.length : 0} de ${total}`);
+                console.log(`📄 Página ${page} de ${totalPages}`);
+                
+                res.json({
+                    matches: matches || [],
+                    pagination: {
+                        page,
+                        limit,
+                        total,
+                        totalPages,
+                        hasNext: page < totalPages,
+                        hasPrevious: page > 1
+                    },
+                    filter: filter || 'all'
+                });
+            });
         });
         
     } catch (error) {
         console.error('❌ Error en route matches/upcoming:', error);
-        res.json([]); // Siempre devolver array vacío
+        res.json({ 
+            matches: [], 
+            pagination: { page: 1, limit: 10, total: 0, totalPages: 0 }
+        });
     }
 });
+
 
 
 

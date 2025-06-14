@@ -2155,3 +2155,76 @@ main {
         text-align: left;
     }
 }
+
+/* Estilos para paginación y filtros */
+.matches-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.filter-controls {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.filter-buttons {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.pagination-info {
+    color: #718096;
+    font-size: 0.9rem;
+}
+
+.pagination-controls {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 1rem;
+    margin-top: 1.5rem;
+    padding: 1rem;
+    border-top: 1px solid #e2e8f0;
+}
+
+.page-info {
+    font-weight: 500;
+    color: #4a5568;
+}
+
+.pagination-controls button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.existing-prediction {
+    color: #38a169;
+    font-weight: 500;
+}
+
+.no-prediction {
+    color: #ed8936;
+    font-style: italic;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .matches-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .filter-controls {
+        justify-content: center;
+    }
+    
+    .pagination-controls {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+}

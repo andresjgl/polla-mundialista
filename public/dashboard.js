@@ -1,5 +1,10 @@
 // public/dashboard.js - VERSIÓN FINAL CON LÓGICA DE CARGA CORREGIDA
 
+let currentPage = 1;
+let currentFilter = 'all';
+const matchesPerPage = 10;
+
+
 document.addEventListener('DOMContentLoaded', async () => {
     const token = localStorage.getItem('token');
     const user = JSON.parse(localStorage.getItem('user') || '{}');
@@ -27,6 +32,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             await loadUserPredictions();
         }
     }
+
+    loadUpcomingMatches(1, 'all');
+
 });
 
 // --- FUNCIÓN DE UTILIDAD (¡AHORA DEFINIDA!) ---
@@ -152,31 +160,31 @@ async function loadLeaderboard() {
 
 // --- ¡NUEVAS FUNCIONES! ---
 
-// En dashboard.js, reemplaza loadUpcomingMatches:
-async function loadUpcomingMatches() {
+// NUEVA función loadUpcomingMatches con paginación
+async function loadUpcomingMatches(page = 1, filter = 'all') {
     const container = document.getElementById('upcomingMatches');
     container.innerHTML = `<p>Cargando partidos...</p>`;
     
     try {
-        console.log('🔍 Solicitando partidos próximos...');
+        console.log(`🔍 Cargando página ${page} con filtro ${filter}...`);
         
-        const response = await fetchWithAuth('/api/matches/upcoming');
-        if (!response) {
-            console.log('⚠️ No hay respuesta (probablemente token expirado)');
-            return;
+        const url = `/api/matches/upcoming?page=${page}&limit=${matchesPerPage}&filter=${filter}`;
+        const response = await fetchWithAuth(url);
+        
+        if (!response || !response.ok) {
+            console.error('❌ Error en respuesta:', response?.status);
+            throw new Error(`HTTP ${response?.status || 'unknown'}`);
         }
         
-        if (!response.ok) {
-            console.error('❌ Error en respuesta:', response.status);
-            throw new Error(`HTTP ${response.status}`);
-        }
+        const data = await response.json();
+        console.log('📊 Datos recibidos:', data);
         
-        const matches = await response.json();
-        console.log('📊 Respuesta recibida:', matches);
-        console.log('📊 Tipo de respuesta:', typeof matches);
-        console.log('📊 Es array?', Array.isArray(matches));
+        // Actualizar variables globales
+        currentPage = page;
+        currentFilter = filter;
         
-        await displayUpcomingMatches(matches);
+        // Mostrar partidos y controles
+        await displayUpcomingMatchesWithPagination(data);
         
     } catch (error) {
         console.error('❌ Error cargando próximos partidos:', error);
@@ -190,6 +198,164 @@ async function loadUpcomingMatches() {
         `;
     }
 }
+
+// NUEVA función para mostrar partidos con paginación
+async function displayUpcomingMatchesWithPagination(data) {
+    const container = document.getElementById('upcomingMatches');
+    const { matches, pagination, filter } = data;
+    
+    console.log('🎯 Mostrando partidos con paginación:', { 
+        matches: matches.length, 
+        pagination, 
+        filter 
+    });
+    
+    if (!matches || matches.length === 0) {
+        container.innerHTML = `
+            <div class="matches-header">
+                <h3>⚽ Próximos Partidos</h3>
+                ${createFilterControls(pagination.total, filter)}
+            </div>
+            <div class="no-data">
+                <p>📅 ${filter === 'no-prediction' ? 'No hay partidos sin predicción' : 'No hay partidos programados'}.</p>
+            </div>
+        `;
+        return;
+    }
+
+    try {
+        // Cargar predicciones del usuario
+        const predictionsResponse = await fetchWithAuth('/api/predictions/user');
+        const userPredictions = predictionsResponse && predictionsResponse.ok ? 
+            await predictionsResponse.json() : [];
+        
+        const predictionsMap = new Map();
+        if (Array.isArray(userPredictions)) {
+            userPredictions.forEach(p => predictionsMap.set(p.match_id, p));
+        }
+
+        // Generar HTML
+        const headerHTML = `
+            <div class="matches-header">
+                <h3>⚽ Próximos Partidos</h3>
+                ${createFilterControls(pagination.total, filter)}
+                ${createPaginationInfo(pagination)}
+            </div>
+        `;
+
+        const matchesHTML = matches.map(match => {
+            const prediction = predictionsMap.get(match.id);
+            const hasPrediction = !!prediction;
+            
+            return `
+                <div class="match-card" data-match-id="${match.id}">
+                    <div class="match-info">
+                        <div class="teams">
+                            <span class="team">${match.home_team}</span> 
+                            <span class="vs">vs</span> 
+                            <span class="team">${match.away_team}</span>
+                        </div>
+                        <div class="match-date">${formatFullDate(match.match_date)}</div>
+                        <div class="phase-info">
+                            <small>📋 ${match.phase_name} - ${match.tournament_name}</small>
+                        </div>
+                        ${hasPrediction ? `
+                            <div class="existing-prediction">
+                                <small>✅ Tu predicción: ${prediction.predicted_home_score} - ${prediction.predicted_away_score}</small>
+                            </div>
+                        ` : `
+                            <div class="no-prediction">
+                                <small>⏳ Sin predicción</small>
+                            </div>
+                        `}
+                    </div>
+                    <div class="match-actions">
+                        <button class="btn ${hasPrediction ? 'btn-secondary' : 'btn-primary'} btn-small" 
+                                onclick="showPredictionForm('${match.id}', '${match.home_team}', '${match.away_team}', ${hasPrediction ? `'${prediction.predicted_home_score}', '${prediction.predicted_away_score}'` : 'null, null'})">
+                            ${hasPrediction ? 'Editar' : 'Predecir'}
+                        </button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        const paginationHTML = createPaginationControls(pagination);
+
+        container.innerHTML = headerHTML + matchesHTML + paginationHTML;
+        console.log('✅ Partidos con paginación renderizados exitosamente');
+        
+    } catch (error) {
+        console.error('❌ Error renderizando partidos:', error);
+        container.innerHTML = `<div class="no-data"><p>Error mostrando partidos</p></div>`;
+    }
+}
+
+// Crear controles de filtro
+function createFilterControls(total, currentFilter) {
+    return `
+        <div class="filter-controls">
+            <div class="filter-buttons">
+                <button class="btn btn-small ${currentFilter === 'all' ? 'btn-primary' : 'btn-secondary'}" 
+                        onclick="changeFilter('all')">
+                    Todos (${total})
+                </button>
+                <button class="btn btn-small ${currentFilter === 'no-prediction' ? 'btn-primary' : 'btn-secondary'}" 
+                        onclick="changeFilter('no-prediction')">
+                    Sin predicción
+                </button>
+            </div>
+        </div>
+    `;
+}
+
+// Crear información de paginación
+function createPaginationInfo(pagination) {
+    const start = ((pagination.page - 1) * pagination.limit) + 1;
+    const end = Math.min(pagination.page * pagination.limit, pagination.total);
+    
+    return `
+        <div class="pagination-info">
+            <small>Mostrando ${start}-${end} de ${pagination.total} partidos</small>
+        </div>
+    `;
+}
+
+// Crear controles de paginación
+function createPaginationControls(pagination) {
+    if (pagination.totalPages <= 1) return '';
+    
+    return `
+        <div class="pagination-controls">
+            <button class="btn btn-secondary btn-small" 
+                    ${!pagination.hasPrevious ? 'disabled' : ''} 
+                    onclick="changePage(${pagination.page - 1})">
+                « Anterior
+            </button>
+            
+            <span class="page-info">
+                Página ${pagination.page} de ${pagination.totalPages}
+            </span>
+            
+            <button class="btn btn-secondary btn-small" 
+                    ${!pagination.hasNext ? 'disabled' : ''} 
+                    onclick="changePage(${pagination.page + 1})">
+                Siguiente »
+            </button>
+        </div>
+    `;
+}
+
+// Funciones de navegación
+window.changePage = function(page) {
+    if (page >= 1) {
+        loadUpcomingMatches(page, currentFilter);
+    }
+};
+
+window.changeFilter = function(filter) {
+    loadUpcomingMatches(1, filter); // Volver a página 1 al cambiar filtro
+};
+
 
 
 
