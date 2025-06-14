@@ -1,31 +1,50 @@
 // routes/admin.js - Rutas de administración
 const express = require('express');
 const { authenticateToken, requireAdmin } = require('./auth');
+const { db } = require('../database');
 
 const router = express.Router();
 
+
 // ============= GESTIÓN DE TORNEOS =============
 
-// GET /api/admin/tournaments - Listar todos los torneos
-router.get('/tournaments', authenticateToken, requireAdmin, async (req, res) => {
-    console.log('🔍 GET /tournaments solicitado');
+// GET /api/admin/active-tournament - Obtener torneo activo (VERSIÓN FINAL Y FUNCIONAL)
+router.get('/active-tournament', (req, res) => {
+    const query = `
+        SELECT
+            t.id,
+            t.name,
+            t.start_date,
+            t.end_date,
+            t.status,
+            COALESCE(COUNT(m.id), 0) as total_matches,
+            COALESCE(SUM(CASE WHEN m.status = 'finished' THEN 1 ELSE 0 END), 0) as finished_matches,
+            (SELECT COUNT(*) FROM predictions_new p JOIN matches_new m2 ON p.match_id = m2.id WHERE m2.tournament_id = t.id) as total_predictions
+        FROM tournaments t
+        LEFT JOIN matches_new m ON t.id = m.tournament_id
+        WHERE t.status = 'active'
+        GROUP BY t.id
+        LIMIT 1;
+    `;
     
-    try {
-        const { db } = require('../database');
-        
-        db.all('SELECT * FROM tournaments ORDER BY created_at DESC', [], (err, tournaments) => {
-            if (err) {
-                console.error('❌ Error obteniendo torneos:', err);
-                return res.json([]);
-            }
-            
-            console.log(`✅ Torneos encontrados: ${tournaments ? tournaments.length : 0}`);
-            res.json(tournaments || []);
-        });
-    } catch (error) {
-        console.error('❌ Error en route tournaments:', error);
-        res.json([]);
-    }
+    db.get(query, [], (err, tournament) => {
+        if (err) {
+            console.error('❌ Error obteniendo torneo activo:', err);
+            return res.status(500).json({ error: 'Error interno del servidor.' });
+        }
+        res.json({ active_tournament: tournament || null });
+    });
+});
+
+// GET /api/admin/tournaments - Listar todos los torneos
+router.get('/tournaments', authenticateToken, requireAdmin, (req, res) => {
+    db.all('SELECT * FROM tournaments ORDER BY created_at DESC', [], (err, tournaments) => {
+        if (err) {
+            console.error('❌ Error obteniendo torneos:', err);
+            return res.json([]);
+        }
+        res.json(tournaments || []);
+    });
 });
 
 

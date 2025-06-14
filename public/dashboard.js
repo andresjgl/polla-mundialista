@@ -15,43 +15,57 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     document.getElementById('userName').textContent = user.name || 'Usuario';
     
-    // --- LÓGICA DE CARGA CORREGIDA ---
-    // 1. Primero, revisamos si la cuenta está activa.
     checkAccountStatus(user);
 
-    // 2. Si la cuenta está activa, procedemos a cargar el resto de datos.
+    // Solo si la cuenta está activa, cargamos el resto.
     if (user.is_active) {
         const activeTournament = await loadActiveTournament();
-        // 3. Solo si hay un torneo, cargamos los datos dependientes.
         if (activeTournament) {
             await loadUserStats(user.id);
+            await loadLeaderboard();
             await loadUpcomingMatches();
             await loadUserPredictions();
-            await loadLeaderboard();
         }
     }
 });
 
-// Muestra si la cuenta está activa o pendiente
+// --- FUNCIÓN DE UTILIDAD (¡AHORA DEFINIDA!) ---
+async function fetchWithAuth(url, options = {}) {
+    const token = localStorage.getItem('token');
+    const defaultOptions = {
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            ...options.headers
+        },
+        ...options
+    };
+    const response = await fetch(url, defaultOptions);
+    if (response.status === 401) {
+        logout();
+        return null;
+    }
+    return response;
+}
+
+// --- FUNCIONES DE CARGA Y VISUALIZACIÓN ---
+
 function checkAccountStatus(user) {
     const statusBanner = document.getElementById('accountStatus');
     if (!user.is_active) {
         statusBanner.className = 'status-banner inactive';
-        statusBanner.innerHTML = `<strong>⏳ Cuenta Pendiente de Activación</strong><br>Tu cuenta debe ser activada por un administrador.`;
-        disableFeaturesForInactiveUser(); // Deshabilita secciones si no está activo
+        statusBanner.innerHTML = `<strong>⏳ Cuenta Pendiente de Activación</strong>`;
+        disableFeaturesForInactiveUser();
     } else {
         statusBanner.className = 'status-banner active';
-        statusBanner.innerHTML = `<strong>✅ Cuenta Activa</strong><br>¡Ya puedes hacer predicciones!`;
+        statusBanner.innerHTML = `<strong>✅ ¡Tu cuenta está activa!</strong>`;
     }
 }
 
-// Carga la información del torneo activo
 async function loadActiveTournament() {
     try {
         const response = await fetchWithAuth('/api/admin/active-tournament');
-        if (!response) return null; // fetchWithAuth maneja el 401
-        if (!response.ok) throw new Error('Respuesta del servidor no fue OK');
-        
+        if (!response || !response.ok) throw new Error('No se pudo contactar al servidor.');
         const data = await response.json();
         
         if (data.active_tournament) {
@@ -63,44 +77,27 @@ async function loadActiveTournament() {
         }
     } catch (error) {
         console.error('Error cargando torneo activo:', error);
-        displayNoActiveTournament(); // Muestra el mensaje correcto si hay error
+        displayNoActiveTournament();
         return null;
     }
 }
 
-// Muestra los datos del torneo activo
 function displayActiveTournament(tournament) {
     const container = document.getElementById('activeTournamentInfo');
-    
-    const tournamentName = tournament.name || "Torneo sin nombre";
+    const tournamentName = tournament.name || "Torneo";
     const totalMatches = tournament.total_matches || 0;
     const finishedMatches = tournament.finished_matches || 0;
     const totalPredictions = tournament.total_predictions || 0;
-    
     const progress = totalMatches > 0 ? Math.round((finishedMatches / totalMatches) * 100) : 0;
-
     container.innerHTML = `
-        <div class="tournament-active-header">
-            <h3>🏆 ${tournamentName}</h3>
-            <span class="tournament-status-badge active">ACTIVO</span>
-        </div>
+        <div class="tournament-active-header"><h3>🏆 ${tournamentName}</h3><span class="tournament-status-badge active">ACTIVO</span></div>
         <div class="tournament-stats">
-            <div class="tournament-stat">
-                <span class="stat-label">Progreso</span>
-                <div class="progress-bar"><div class="progress-fill" style="width: ${progress}%;"></div></div>
-                <span class="stat-value">${finishedMatches}/${totalMatches} partidos</span>
-            </div>
-            <div class="tournament-stat">
-                <span class="stat-label">Predicciones Totales</span>
-                <span class="stat-value">${totalPredictions}</span>
-            </div>
-            <div class="tournament-stat">
-                <span class="stat-label">Período</span>
-                <span class="stat-value">${formatSimpleDate(tournament.start_date)} - ${formatSimpleDate(tournament.end_date)}</span>
-            </div>
-        </div>
-    `;
+            <div class="tournament-stat"><span class="stat-label">Progreso</span><div class="progress-bar"><div class="progress-fill" style="width: ${progress}%;"></div></div><span class="stat-value">${finishedMatches}/${totalMatches} partidos</span></div>
+            <div class="tournament-stat"><span class="stat-label">Predicciones</span><span class="stat-value">${totalPredictions}</span></div>
+            <div class="tournament-stat"><span class="stat-label">Período</span><span class="stat-value">${formatSimpleDate(tournament.start_date)} - ${formatSimpleDate(tournament.end_date)}</span></div>
+        </div>`;
 }
+
 
 // Muestra el mensaje de que no hay torneo activo
 function displayNoActiveTournament() {
