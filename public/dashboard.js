@@ -305,3 +305,71 @@ window.submitPrediction = async function(event, matchId) {
         alert(`Error: ${error.error}`);
     }
 }
+
+// --- PEGA ESTAS FUNCIONES AL FINAL DE public/dashboard.js ---
+
+window.showFullLeaderboard = async function() {
+    const modal = document.createElement('div');
+    modal.className = 'leaderboard-modal'; // Usamos una clase específica para evitar conflictos
+    modal.innerHTML = `
+        <div class="modal-content large">
+            <div class="modal-header">
+                <h3>🏆 Tabla de Posiciones Completa</h3>
+                <button class="close-modal" onclick="closeLeaderboardModal()">&times;</button>
+            </div>
+            <div class="modal-body" id="fullLeaderboardContent">
+                <p>Cargando tabla completa...</p>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+
+    try {
+        // ✅ CORRECCIÓN: Llamamos a la nueva ruta /api/leaderboard/full
+        const response = await fetchWithAuth('/api/leaderboard/full');
+        if (!response || !response.ok) throw new Error('Error al cargar la tabla completa.');
+
+        const leaderboardData = await response.json();
+        const currentUserId = JSON.parse(localStorage.getItem('user')).id;
+        
+        const contentDiv = document.getElementById('fullLeaderboardContent');
+        
+        if (!leaderboardData || leaderboardData.length === 0) {
+            contentDiv.innerHTML = `<div class="no-data"><p>No hay datos en la tabla de posiciones.</p></div>`;
+            return;
+        }
+
+        contentDiv.innerHTML = `
+            <div class="leaderboard-table full">
+                <div class="leaderboard-header-row">
+                    <div class="pos">Pos.</div>
+                    <div class="name">Participante</div>
+                    <div class="predictions">Aciertos</div>
+                    <div class="points">Puntos</div>
+                </div>
+                ${leaderboardData.map(user => {
+                    const isCurrentUser = user.id == currentUserId;
+                    const isTop3 = user.position <= 3;
+                    return `
+                    <div class="leaderboard-row ${isCurrentUser ? 'current-user' : ''} ${isTop3 ? 'top-three' : ''}">
+                        <div class="pos">${user.position}</div>
+                        <div class="name">${user.name} ${isCurrentUser ? '<span class="you-badge">TÚ</span>' : ''}</div>
+                        <div class="predictions">${user.successful_predictions}/${user.total_predictions}</div>
+                        <div class="points"><strong>${user.total_points}</strong></div>
+                    </div>
+                    `
+                }).join('')}
+            </div>
+        `;
+    } catch (error) {
+        console.error('Error en showFullLeaderboard:', error);
+        document.getElementById('fullLeaderboardContent').innerHTML = `<div class="no-data"><p>No se pudo cargar la tabla.</p></div>`;
+    }
+}
+
+window.closeLeaderboardModal = function() {
+    const modal = document.querySelector('.leaderboard-modal');
+    if (modal) {
+        modal.remove();
+    }
+}

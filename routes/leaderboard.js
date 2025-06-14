@@ -1,193 +1,102 @@
-// routes/leaderboard.js - Tabla de posiciones
+// routes/leaderboard.js - VERSIÓN MEJORADA CON TABLA COMPLETA
+
 const express = require('express');
+const { db } = require('../database');
 const { authenticateToken } = require('./auth');
 
 const router = express.Router();
 
-// GET /api/leaderboard - Tabla de posiciones (SOLO TORNEO ACTIVO)
-// GET /api/leaderboard - Tabla de posiciones (SIN ADMINS)
-router.get('/', async (req, res) => {
-    console.log('🔍 GET /leaderboard - versión simplificada');
-    
+// GET /api/leaderboard - Tabla de posiciones para el DASHBOARD (TOP 5)
+router.get('/', authenticateToken, async (req, res) => {
+    const query = `
+        SELECT
+            u.id,
+            u.name,
+            COALESCE(SUM(p.points_earned), 0) AS total_points,
+            ROW_NUMBER() OVER (ORDER BY COALESCE(SUM(p.points_earned), 0) DESC, u.name ASC) AS position
+        FROM users u
+        LEFT JOIN predictions_new p ON u.id = p.user_id
+        WHERE u.is_admin = false AND u.is_active = true
+        GROUP BY u.id, u.name
+        ORDER BY total_points DESC, u.name ASC;
+    `;
     try {
-        const { db } = require('../database');
-        
-        // Query súper simple que SÍ funciona en PostgreSQL
-        db.all(`
-            SELECT 
+        const { rows } = await db.query(query);
+        res.json(rows || []);
+    } catch (error) {
+        console.error('Error en GET /api/leaderboard:', error);
+        res.status(500).json({ error: 'Error interno del servidor.' });
+    }
+});
+
+// GET /api/leaderboard/full - Tabla de posiciones COMPLETA para el MODAL
+router.get('/full', authenticateToken, async (req, res) => {
+    const query = `
+        WITH user_points AS (
+            SELECT
                 u.id,
                 u.name,
-                0 as total_points,
-                0 as total_predictions,
-                1 as position
+                COALESCE(SUM(p.points_earned), 0) AS total_points,
+                COUNT(p.id) AS total_predictions,
+                COALESCE(SUM(CASE WHEN p.points_earned > 0 THEN 1 ELSE 0 END), 0) AS successful_predictions,
+                COALESCE(SUM(p.result_points), 0) as result_points,
+                COALESCE(SUM(p.score_points), 0) as score_points
             FROM users u
+            LEFT JOIN predictions_new p ON u.id = p.user_id
+            JOIN matches_new m ON p.match_id = m.id
+            JOIN tournaments t ON m.tournament_id = t.id AND t.status = 'active'
             WHERE u.is_admin = false AND u.is_active = true
-            ORDER BY u.name
-            LIMIT 10
-        `, [], (err, users) => {
-            if (err) {
-                console.error('❌ Error en leaderboard simple:', err);
-                console.log('📤 Devolviendo array vacío');
-                return res.json([]);
-            }
-            
-            console.log(`✅ Leaderboard simple: ${users ? users.length : 0} usuarios`);
-            
-            // Asegurar formato correcto
-            const safeUsers = (users || []).map((user, index) => ({
-                id: user.id || 0,
-                name: user.name || 'Usuario',
-                total_points: 0,
-                total_predictions: 0,
-                position: index + 1
-            }));
-            
-            console.log('📤 Devolviendo:', safeUsers);
-            res.json(safeUsers);
-        });
-        
-    } catch (error) {
-        console.error('❌ Error catch en leaderboard:', error);
-        res.json([]);
-    }
-});
-
-
-// GET /api/leaderboard/user/:userId - Posición específica (SIN ADMINS)
-router.get('/user/:userId', authenticateToken, async (req, res) => {
-    console.log('🔍 GET /leaderboard/user/:userId solicitado');
-    
+            GROUP BY u.id, u.name
+        )
+        SELECT
+            *,
+            ROW_NUMBER() OVER (ORDER BY total_points DESC, name ASC) AS position
+        FROM user_points
+        ORDER BY position ASC;
+    `;
     try {
-        const { userId } = req.params;
-        const { db } = require('../database');
-        
-        // Verificar si el usuario es admin
-        db.get('SELECT is_admin FROM users WHERE id = ?', [userId], (err, user) => {
-            if (err) {
-                console.error('❌ Error verificando usuario:', err);
-                // NO devolver error 500, sino datos por defecto
-                return res.json({
-                    id: userId,
-                    total_points: 0,
-                    total_predictions: 0,
-                    position: null,
-                    total_participants: 0,
-                    tournament_name: null,
-                    is_admin: false
-                });
-            }
-            
-            if (user && user.is_admin) {
-                console.log('👑 Usuario es admin, devolviendo datos vacíos');
-                // Si es admin, devolver datos vacíos
-                return res.json({
-                    id: userId,
-                    total_points: 0,
-                    total_predictions: 0,
-                    position: null,
-                    total_participants: 0,
-                    tournament_name: null,
-                    is_admin: true
-                });
-            }
-            
-            // Si no es admin, proceder normalmente - QUERY ARREGLADA PARA POSTGRESQL
-            db.get(`
-                SELECT u.id, u.name,
-                       COALESCE(SUM(p.points_earned), 0) as total_points,
-                       COUNT(p.id) as total_predictions,
-                       COALESCE(t.name, 'Sin torneo') as tournament_name
-                FROM users u
-                LEFT JOIN predictions_new p ON u.id = p.user_id
-                LEFT JOIN matches_new m ON p.match_id = m.id
-                LEFT JOIN tournaments t ON m.tournament_id = t.id
-                WHERE u.id = ? AND u.is_active = true AND u.is_admin = false
-                  AND (t.status = 'active' OR t.status IS NULL)
-                GROUP BY u.id, u.name, t.name
-            `, [userId], (err, userStats) => {
-                if (err) {
-                    console.error('❌ Error obteniendo stats del usuario:', err);
-                    // NO devolver error 500, sino datos por defecto
-                    return res.json({
-                        id: userId,
-                        total_points: 0,
-                        total_predictions: 0,
-                        position: 1,
-                        total_participants: 0,
-                        tournament_name: null
-                    });
-                }
-
-                if (!userStats) {
-                    console.log('⚠️ Usuario no encontrado o sin datos');
-                    return res.json({
-                        id: userId,
-                        total_points: 0,
-                        total_predictions: 0,
-                        position: 1,
-                        total_participants: 0,
-                        tournament_name: null
-                    });
-                }
-
-                // Obtener posición del usuario (solo entre no-admins) - ARREGLADO PARA POSTGRESQL
-                db.get(`
-                    SELECT COUNT(*) + 1 as position
-                    FROM (
-                        SELECT u.id, COALESCE(SUM(p.points_earned), 0) as total_points
-                        FROM users u
-                        LEFT JOIN predictions_new p ON u.id = p.user_id
-                        LEFT JOIN matches_new m ON p.match_id = m.id
-                        LEFT JOIN tournaments t ON m.tournament_id = t.id
-                        WHERE u.is_active = true AND u.is_admin = false
-                          AND (t.status = 'active' OR t.status IS NULL)
-                        GROUP BY u.id
-                        HAVING COALESCE(SUM(p.points_earned), 0) > ?
-                    ) ranked_users
-                `, [userStats.total_points], (err, positionResult) => {
-                    if (err) {
-                        console.error('❌ Error obteniendo posición:', err);
-                        // Continuar sin error 500
-                    }
-
-                    // Obtener total de participantes activos (sin admins) - ARREGLADO PARA POSTGRESQL
-                    db.get(`
-                        SELECT COUNT(DISTINCT u.id) as total_participants
-                        FROM users u
-                        WHERE u.is_active = true AND u.is_admin = false
-                    `, (err, totalResult) => {
-                        if (err) {
-                            console.error('❌ Error obteniendo total:', err);
-                            // Continuar sin error 500
-                        }
-
-                        const finalStats = {
-                            ...userStats,
-                            position: positionResult?.position || 1,
-                            total_participants: totalResult?.total_participants || 0
-                        };
-
-                        console.log('✅ Estadísticas del usuario (sin admins):', finalStats);
-                        res.json(finalStats);
-                    });
-                });
-            });
-        });
+        const { rows } = await db.query(query);
+        res.json(rows || []);
     } catch (error) {
-        console.error('❌ Error obteniendo posición del usuario:', error);
-        // NO devolver error 500, sino datos por defecto
-        res.json({
-            id: userId,
-            total_points: 0,
-            total_predictions: 0,
-            position: 1,
-            total_participants: 0,
-            tournament_name: null,
-            error: true
-        });
+        console.error('Error en GET /api/leaderboard/full:', error);
+        res.status(500).json({ error: 'Error interno del servidor.' });
     }
 });
 
-
+// GET /api/leaderboard/user/:userId - Posición de un usuario específico
+router.get('/user/:userId', authenticateToken, async (req, res) => {
+    const { userId } = req.params;
+    const query = `
+        WITH ranked_users AS (
+            SELECT
+                u.id,
+                COALESCE(SUM(p.points_earned), 0) AS total_points,
+                ROW_NUMBER() OVER (ORDER BY COALESCE(SUM(p.points_earned), 0) DESC, u.name ASC) AS position
+            FROM users u
+            LEFT JOIN predictions_new p ON u.id = p.user_id
+            WHERE u.is_admin = false AND u.is_active = true
+            GROUP BY u.id, u.name
+        )
+        SELECT
+            ru.total_points,
+            ru.position,
+            (SELECT COUNT(*) FROM users WHERE is_admin = false AND is_active = true) as total_participants
+        FROM ranked_users ru
+        WHERE ru.id = $1;
+    `;
+    try {
+        const { rows } = await db.query(query, [userId]);
+        if (rows.length > 0) {
+            res.json(rows[0]);
+        } else {
+            // Si el usuario no tiene predicciones, no aparecerá en el ranking, así que le damos un resultado por defecto.
+            const { rows: totalUsersRows } = await db.query('SELECT COUNT(*) as total_participants FROM users WHERE is_admin = false AND is_active = true');
+            res.json({ total_points: 0, position: '-', total_participants: totalUsersRows[0].total_participants });
+        }
+    } catch (error) {
+        console.error('Error en GET /api/leaderboard/user/:userId:', error);
+        res.status(500).json({ error: 'Error interno del servidor.' });
+    }
+});
 
 module.exports = router;
