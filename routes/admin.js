@@ -1287,7 +1287,7 @@ router.delete('/teams/:id', authenticateToken, requireAdmin, async (req, res) =>
 
 // ============= GESTIÓN DE PARTIDOS =============
 
-// POST /api/admin/matches - Crear partido
+// POST /api/admin/matches - Crear partido (CON ZONA HORARIA COLOMBIA)
 router.post('/matches', authenticateToken, requireAdmin, async (req, res) => {
     try {
         const { 
@@ -1299,6 +1299,8 @@ router.post('/matches', authenticateToken, requireAdmin, async (req, res) => {
             external_match_id 
         } = req.body;
 
+        console.log('🕐 Fecha recibida del frontend:', match_date);
+
         if (!tournament_id || !phase_id || !home_team_id || !away_team_id || !match_date) {
             return res.status(400).json({ 
                 error: 'Torneo, fase, equipos y fecha son requeridos' 
@@ -1309,6 +1311,25 @@ router.post('/matches', authenticateToken, requireAdmin, async (req, res) => {
             return res.status(400).json({ 
                 error: 'Un equipo no puede jugar contra sí mismo' 
             });
+        }
+
+        // ✅ NUEVO: PROCESAR FECHA PARA ZONA HORARIA COLOMBIA
+        let formattedDate;
+        try {
+            // El input datetime-local envía formato: "2025-06-14T19:00"
+            // Necesitamos agregarlo como zona horaria Colombia (-05:00)
+            if (match_date.includes('T')) {
+                // Si ya tiene formato ISO, agregar zona horaria Colombia
+                formattedDate = `${match_date}:00-05:00`;
+            } else {
+                // Si no tiene formato completo, procesarlo
+                const date = new Date(match_date);
+                formattedDate = date.toISOString().slice(0, 19) + '-05:00';
+            }
+            console.log('🇨🇴 Fecha procesada para Colombia:', formattedDate);
+        } catch (error) {
+            console.error('❌ Error procesando fecha:', error);
+            return res.status(400).json({ error: 'Formato de fecha inválido' });
         }
 
         const { db } = require('../database');
@@ -1327,18 +1348,21 @@ router.post('/matches', authenticateToken, requireAdmin, async (req, res) => {
             // Generar ID único para el partido
             const matchId = `${tournament_id}_${phase_id}_${home_team_id}_${away_team_id}_${Date.now()}`;
 
+            // ✅ USAR LA FECHA PROCESADA CON ZONA HORARIA
             db.run(`
                 INSERT INTO matches_new 
                 (id, tournament_id, phase_id, home_team_id, away_team_id, 
                  home_team, away_team, match_date, external_match_id, status)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'scheduled')
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?::timestamptz, ?, 'scheduled')
             `, [matchId, tournament_id, phase_id, home_team_id, away_team_id, 
-                homeTeam.name, awayTeam.name, match_date, external_match_id || ''], 
+                homeTeam.name, awayTeam.name, formattedDate, external_match_id || ''], 
             function(err) {
                 if (err) {
-                    console.error('Error creando partido:', err);
-                    return res.status(500).json({ error: 'Error creando partido' });
+                    console.error('❌ Error creando partido:', err);
+                    return res.status(500).json({ error: 'Error creando partido: ' + err.message });
                 }
+
+                console.log(`✅ Partido creado: ${homeTeam.name} vs ${awayTeam.name} para ${formattedDate}`);
 
                 res.status(201).json({
                     message: 'Partido creado exitosamente',
@@ -1348,17 +1372,18 @@ router.post('/matches', authenticateToken, requireAdmin, async (req, res) => {
                         phase_id,
                         home_team: homeTeam.name,
                         away_team: awayTeam.name,
-                        match_date,
+                        match_date: formattedDate,
                         status: 'scheduled'
                     }
                 });
             });
         });
     } catch (error) {
-        console.error('Error creando partido:', error);
-        res.status(500).json({ error: 'Error interno del servidor' });
+        console.error('❌ Error creando partido:', error);
+        res.status(500).json({ error: 'Error interno del servidor: ' + error.message });
     }
 });
+
 
 // GET /api/admin/active-tournament - Obtener torneo activo (VERSIÓN CORREGIDA Y ROBUSTA)
 router.get('/active-tournament', (req, res) => {
