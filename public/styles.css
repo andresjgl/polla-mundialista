@@ -1238,6 +1238,10 @@ main {
     .tournament-stats {
         grid-template-columns: 1fr;
     }
+
+    .tournament-actions {
+        flex-direction: column;
+    }
 }
 
 /* Estilos para formularios de admin */
