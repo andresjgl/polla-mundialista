@@ -90,12 +90,26 @@ async function fetchWithAuth(url, options = {}) {
 
 // ============= FUNCIONES EXISTENTES (Stats y Users) =============
 
+// Actualizar loadStats para mostrar también pendientes
 async function loadStats() {
     try {
         console.log('📊 Cargando estadísticas...');
         
-        const response = await fetchWithAuth('/api/auth/stats');
-        if (!response) return; // Token expirado, ya se manejó
+        const token = localStorage.getItem('token');
+        const response = await fetch('/api/auth/stats', {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (response.status === 401) {
+            console.log('🔐 Token expirado, redirigiendo a login...');
+            localStorage.removeItem('token');
+            alert('Tu sesión ha expirado. Por favor, inicia sesión de nuevo.');
+            window.location.href = '/login.html';
+            return;
+        }
         
         if (response.ok) {
             const stats = await response.json();
@@ -103,6 +117,12 @@ async function loadStats() {
             
             document.getElementById('totalUsers').textContent = stats.total_users || 0;
             document.getElementById('activeUsers').textContent = stats.active_users || 0;
+            
+            // Actualizar contador de pendientes si existe
+            const pendingElement = document.getElementById('pendingUsers');
+            if (pendingElement) {
+                pendingElement.textContent = stats.pending_users || 0;
+            }
         } else {
             console.error('Error cargando estadísticas:', response.status);
             document.getElementById('totalUsers').textContent = '?';
@@ -116,12 +136,26 @@ async function loadStats() {
 }
 
 
+
 async function loadPendingUsers() {
     try {
         console.log('👥 Cargando usuarios pendientes...');
         
-        const response = await fetchWithAuth('/api/auth/pending-users');
-        if (!response) return; // Token expirado
+        const token = localStorage.getItem('token');
+        const response = await fetch('/api/auth/pending-users', {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (response.status === 401) {
+            console.log('🔐 Token expirado, redirigiendo a login...');
+            localStorage.removeItem('token');
+            alert('Tu sesión ha expirado. Por favor, inicia sesión de nuevo.');
+            window.location.href = '/login.html';
+            return;
+        }
         
         if (response.ok) {
             const users = await response.json();
@@ -139,6 +173,12 @@ async function loadPendingUsers() {
 function displayPendingUsers(users) {
     const container = document.getElementById('pendingUsersList');
 
+    if (!container) {
+        console.log('⚠️ Container pendingUsersList no encontrado');
+        return;
+    }
+    
+    
     if (users.length === 0) {
         container.innerHTML = '<p>✅ No hay usuarios pendientes de activación</p>';
         return;

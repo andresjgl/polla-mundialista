@@ -204,40 +204,59 @@ router.post('/activate/:userId', authenticateToken, requireAdmin, async (req, re
 
 // GET /api/auth/stats - Estadísticas de usuarios
 // GET /api/auth/stats - Estadísticas del dashboard
+// GET /api/auth/stats - Estadísticas excluyendo admins
 router.get('/stats', authenticateToken, requireAdmin, async (req, res) => {
     console.log('🔍 GET /stats solicitado');
     
     try {
         const { db } = require('../database');
         
-        // Contar usuarios totales
-        db.get('SELECT COUNT(*) as total FROM users', [], (err, totalResult) => {
+        // Contar usuarios totales (NO admins)
+        db.get('SELECT COUNT(*) as total FROM users WHERE is_admin = ?', [false], (err, totalResult) => {
             if (err) {
                 console.error('❌ Error contando usuarios totales:', err);
-                return res.json({ total_users: 0, active_users: 0 });
+                return res.json({ total_users: 0, active_users: 0, pending_users: 0 });
             }
             
-            // Contar usuarios activos
-            db.get('SELECT COUNT(*) as active FROM users WHERE is_active = ?', [true], (err2, activeResult) => {
+            // Contar usuarios activos (NO admins)
+            db.get('SELECT COUNT(*) as active FROM users WHERE is_active = ? AND is_admin = ?', [true, false], (err2, activeResult) => {
                 if (err2) {
                     console.error('❌ Error contando usuarios activos:', err2);
-                    return res.json({ total_users: totalResult.total || 0, active_users: 0 });
+                    return res.json({ 
+                        total_users: totalResult.total || 0, 
+                        active_users: 0,
+                        pending_users: 0 
+                    });
                 }
                 
-                const stats = {
-                    total_users: totalResult.total || 0,
-                    active_users: activeResult.active || 0
-                };
-                
-                console.log('✅ Estadísticas:', stats);
-                res.json(stats);
+                // Contar usuarios pendientes (NO admins)
+                db.get('SELECT COUNT(*) as pending FROM users WHERE is_active = ? AND is_admin = ?', [false, false], (err3, pendingResult) => {
+                    if (err3) {
+                        console.error('❌ Error contando usuarios pendientes:', err3);
+                        return res.json({ 
+                            total_users: totalResult.total || 0, 
+                            active_users: activeResult.active || 0,
+                            pending_users: 0 
+                        });
+                    }
+                    
+                    const stats = {
+                        total_users: totalResult.total || 0,
+                        active_users: activeResult.active || 0,
+                        pending_users: pendingResult.pending || 0
+                    };
+                    
+                    console.log('✅ Estadísticas (sin admins):', stats);
+                    res.json(stats);
+                });
             });
         });
     } catch (error) {
         console.error('❌ Error en route stats:', error);
-        res.json({ total_users: 0, active_users: 0 });
+        res.json({ total_users: 0, active_users: 0, pending_users: 0 });
     }
 });
+
 
 
 // GET /api/auth/verify - Verificar token
@@ -251,19 +270,21 @@ router.get('/verify', authenticateToken, (req, res) => {
 
 
 // GET /api/auth/pending-users - Obtener usuarios pendientes
+// GET /api/auth/pending-users - Solo usuarios NO admin
 router.get('/pending-users', authenticateToken, requireAdmin, async (req, res) => {
     console.log('🔍 GET /pending-users solicitado');
     
     try {
         const { db } = require('../database');
         
-        db.all('SELECT id, name, email, created_at FROM users WHERE is_active = ? ORDER BY created_at DESC', [false], (err, users) => {
+        // Solo usuarios pendientes que NO sean admin
+        db.all('SELECT id, name, email, created_at FROM users WHERE is_active = ? AND is_admin = ? ORDER BY created_at DESC', [false, false], (err, users) => {
             if (err) {
                 console.error('❌ Error obteniendo usuarios pendientes:', err);
-                return res.json([]); // Array vacío, no error 500
+                return res.json([]);
             }
             
-            console.log(`✅ Usuarios pendientes: ${users ? users.length : 0}`);
+            console.log(`✅ Usuarios pendientes (sin admins): ${users ? users.length : 0}`);
             res.json(users || []);
         });
     } catch (error) {
@@ -271,6 +292,7 @@ router.get('/pending-users', authenticateToken, requireAdmin, async (req, res) =
         res.json([]);
     }
 });
+
 
 
 
