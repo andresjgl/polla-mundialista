@@ -357,31 +357,72 @@ window.closePredictionModal = function() {
     if (modal) modal.remove();
 }
 
+// En dashboard.js, reemplaza submitPrediction:
 window.submitPrediction = async function(event, matchId) {
     event.preventDefault();
+    
     const form = event.target;
+    const submitButton = form.querySelector('button[type="submit"]');
     const homeScore = form.querySelector('input[name="homeScore"]').value;
     const awayScore = form.querySelector('input[name="awayScore"]').value;
 
-    const response = await fetchWithAuth('/api/predictions', {
-        method: 'POST',
-        body: JSON.stringify({
+    // Validaciones del cliente
+    if (homeScore < 0 || awayScore < 0) {
+        alert('Los goles no pueden ser negativos');
+        return;
+    }
+
+    if (homeScore > 20 || awayScore > 20) {
+        alert('Marcador muy alto, verifica los datos');
+        return;
+    }
+
+    try {
+        submitButton.disabled = true;
+        submitButton.textContent = 'Guardando...';
+
+        console.log('🎯 Enviando predicción:', {
             match_id: matchId,
             predicted_home_score: parseInt(homeScore),
             predicted_away_score: parseInt(awayScore)
-        })
-    });
+        });
 
-    if (response && response.ok) {
-        alert('¡Predicción guardada!');
-        closePredictionModal();
-        await loadUpcomingMatches(); // Recarga partidos para mostrar "Editar"
-        await loadUserPredictions(); // Recarga la lista de predicciones
-    } else {
-        const error = await response.json();
-        alert(`Error: ${error.error}`);
+        const response = await fetchWithAuth('/api/predictions', {
+            method: 'POST',
+            body: JSON.stringify({
+                match_id: matchId,
+                predicted_home_score: parseInt(homeScore),
+                predicted_away_score: parseInt(awayScore)
+            })
+        });
+
+        if (!response) {
+            alert('Error de conexión');
+            return;
+        }
+
+        const responseData = await response.json();
+        console.log('📊 Respuesta del servidor:', responseData);
+
+        if (response.ok) {
+            alert('¡Predicción guardada exitosamente!');
+            closePredictionModal();
+            await loadUpcomingMatches(); // Recarga partidos
+            await loadUserPredictions(); // Recarga predicciones
+        } else {
+            console.error('❌ Error del servidor:', responseData);
+            alert(`Error: ${responseData.error || 'Error desconocido'}`);
+        }
+
+    } catch (error) {
+        console.error('❌ Error enviando predicción:', error);
+        alert('Error de conexión: ' + error.message);
+    } finally {
+        submitButton.disabled = false;
+        submitButton.textContent = 'Guardar';
     }
 }
+
 
 // --- PEGA ESTAS FUNCIONES AL FINAL DE public/dashboard.js ---
 
