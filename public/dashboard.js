@@ -1,4 +1,4 @@
-// public/dashboard.js - VERSIÓN LIMPIA Y CORREGIDA
+// public/dashboard.js - VERSIÓN COMPLETA (CON PARTIDOS Y PREDICCIONES)
 
 document.addEventListener('DOMContentLoaded', async () => {
     const token = localStorage.getItem('token');
@@ -15,22 +15,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     document.getElementById('userName').textContent = user.name || 'Usuario';
-
-    // Cargar y mostrar estado de la cuenta (activo/pendiente)
     checkAccountStatus(user);
 
-    // Cargar datos principales del dashboard
     const activeTournament = await loadActiveTournament();
     
     if (activeTournament) {
-        await loadUserStats(user.id);
-        await loadUpcomingMatches();
-        await loadUserPredictions();
-        await loadLeaderboard();
+        // Solo cargar si la cuenta está activa
+        if(user.is_active) {
+            await loadUserStats(user.id);
+            await loadUpcomingMatches();
+            await loadUserPredictions();
+            await loadLeaderboard();
+        }
     }
 });
 
-// Función para manejar errores 401 (token expirado) de forma centralizada
 async function fetchWithAuth(url, options = {}) {
     const token = localStorage.getItem('token');
     const defaultOptions = {
@@ -41,44 +40,30 @@ async function fetchWithAuth(url, options = {}) {
         },
         ...options
     };
-
     const response = await fetch(url, defaultOptions);
-
     if (response.status === 401) {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        alert('Tu sesión ha expirado. Por favor, inicia sesión de nuevo.');
-        window.location.href = '/login.html';
-        return null; // Devuelve null para que la función que lo llamó se detenga
+        logout();
+        return null;
     }
     return response;
 }
 
-// Muestra si la cuenta está activa o pendiente
 function checkAccountStatus(user) {
     const statusBanner = document.getElementById('accountStatus');
     if (!user.is_active) {
         statusBanner.className = 'status-banner inactive';
-        statusBanner.innerHTML = `
-            <strong>⏳ Cuenta Pendiente de Activación</strong><br>
-            Tu cuenta debe ser activada por un administrador.
-        `;
+        statusBanner.innerHTML = `<strong>⏳ Cuenta Pendiente de Activación</strong><br>Tu cuenta debe ser activada por un administrador.`;
         disableFeaturesForInactiveUser();
     } else {
         statusBanner.className = 'status-banner active';
-        statusBanner.innerHTML = `
-            <strong>✅ Cuenta Activa</strong><br>
-            ¡Ya puedes hacer predicciones!
-        `;
+        statusBanner.innerHTML = `<strong>✅ Cuenta Activa</strong><br>¡Ya puedes hacer predicciones!`;
     }
 }
 
-// Carga la información del torneo activo
 async function loadActiveTournament() {
     try {
-        const response = await fetch('/api/admin/active-tournament'); // Usamos la ruta de admin que ya existe
+        const response = await fetch('/api/admin/active-tournament');
         if (!response.ok) throw new Error('No se pudo cargar el torneo');
-        
         const data = await response.json();
         if (data.active_tournament) {
             displayActiveTournament(data.active_tournament);
@@ -96,51 +81,29 @@ async function loadActiveTournament() {
 
 function displayActiveTournament(tournament) {
     const container = document.getElementById('activeTournamentInfo');
-    const progress = tournament.total_matches > 0 ?
-        Math.round((tournament.finished_matches / tournament.total_matches) * 100) : 0;
-
+    const progress = tournament.total_matches > 0 ? Math.round((tournament.finished_matches / tournament.total_matches) * 100) : 0;
     container.innerHTML = `
-        <div class="tournament-active-header">
-            <h3>🏆 ${tournament.name}</h3>
-            <span class="tournament-status-badge active">ACTIVO</span>
-        </div>
+        <div class="tournament-active-header"><h3>🏆 ${tournament.name}</h3><span class="tournament-status-badge active">ACTIVO</span></div>
         <div class="tournament-stats">
             <div class="tournament-stat">
                 <span class="stat-label">Progreso</span>
-                <div class="progress-bar">
-                    <div class="progress-fill" style="width: ${progress}%;"></div>
-                </div>
+                <div class="progress-bar"><div class="progress-fill" style="width: ${progress}%;"></div></div>
                 <span class="stat-value">${tournament.finished_matches}/${tournament.total_matches} partidos</span>
             </div>
-            <div class="tournament-stat">
-                <span class="stat-label">Predicciones totales</span>
-                <span class="stat-value">${tournament.total_predictions}</span>
-            </div>
-            <div class="tournament-stat">
-                <span class="stat-label">Período</span>
-                <span class="stat-value">${formatSimpleDate(tournament.start_date)} - ${formatSimpleDate(tournament.end_date)}</span>
-            </div>
-        </div>
-    `;
+            <div class="tournament-stat"><span class="stat-label">Predicciones</span><span class="stat-value">${tournament.total_predictions}</span></div>
+            <div class="tournament-stat"><span class="stat-label">Período</span><span class="stat-value">${formatSimpleDate(tournament.start_date)} - ${formatSimpleDate(tournament.end_date)}</span></div>
+        </div>`;
 }
 
 function displayNoActiveTournament() {
-    const container = document.getElementById('activeTournamentInfo');
-    container.innerHTML = `
-        <div class="no-active-tournament">
-            <h3>⏸️ No hay torneo activo</h3>
-            <p>Las predicciones y puntuaciones aparecerán cuando se active un torneo.</p>
-        </div>
-    `;
+    document.getElementById('activeTournamentInfo').innerHTML = `<div class="no-active-tournament"><h3>⏸️ No hay torneo activo</h3><p>Las predicciones aparecerán cuando se active un torneo.</p></div>`;
     disableFeaturesForInactiveUser();
 }
 
-// Carga las estadísticas del usuario (puntos, posición)
 async function loadUserStats(userId) {
     try {
         const response = await fetchWithAuth(`/api/leaderboard/user/${userId}`);
         if (!response || !response.ok) return;
-
         const stats = await response.json();
         document.getElementById('userPoints').textContent = stats.total_points || 0;
         document.getElementById('userPosition').textContent = `#${stats.position || '-'}`;
@@ -150,70 +113,181 @@ async function loadUserStats(userId) {
     }
 }
 
-// Carga la tabla de posiciones
 async function loadLeaderboard() {
     const container = document.getElementById('leaderboardContainer');
+    container.innerHTML = `<p>Cargando tabla...</p>`;
     try {
         const response = await fetchWithAuth('/api/leaderboard');
-        if (!response || !response.ok) {
-             container.innerHTML = `<p>Error al cargar la tabla de posiciones.</p>`;
-             return;
-        }
-
+        if (!response || !response.ok) throw new Error('Error en respuesta del servidor');
         const leaderboard = await response.json();
         if (!leaderboard || leaderboard.length === 0) {
-            container.innerHTML = `<p>Aún no hay participantes en el ranking.</p>`;
+            container.innerHTML = `<div class="no-data"><p>Aún no hay participantes en el ranking.</p></div>`;
             return;
         }
-
-        // Tomamos solo el top 5 para el dashboard
         const top5 = leaderboard.slice(0, 5);
-
-        const leaderboardHTML = `
-            <div class="leaderboard-table">
-                ${top5.map(user => `
-                    <div class="leaderboard-row">
-                        <div class="pos">#${user.position}</div>
-                        <div class="name">${user.name}</div>
-                        <div class="points"><strong>${user.total_points}</strong> pts</div>
-                    </div>
-                `).join('')}
-            </div>
-        `;
-        container.innerHTML = leaderboardHTML;
-
+        container.innerHTML = `<div class="leaderboard-table">${top5.map(user => `
+            <div class="leaderboard-row ${user.id == JSON.parse(localStorage.getItem('user')).id ? 'current-user' : ''}">
+                <div class="pos">#${user.position}</div>
+                <div class="name">${user.name}</div>
+                <div class="points"><strong>${user.total_points || 0}</strong> pts</div>
+            </div>`).join('')}</div>`;
     } catch (error) {
         console.error('Error en loadLeaderboard:', error);
-        container.innerHTML = `<p>Error de conexión al cargar la tabla.</p>`;
+        container.innerHTML = `<div class="no-data"><p>Error al cargar la tabla.</p></div>`;
     }
 }
 
-// Carga los próximos partidos para predecir
+// --- ¡NUEVAS FUNCIONES! ---
+
 async function loadUpcomingMatches() {
-    // ... (el resto de funciones como loadUpcomingMatches, showPredictionForm, etc. irían aquí, pero las dejaremos para el siguiente paso para mantener esto corto)
+    const container = document.getElementById('upcomingMatches');
+    try {
+        const response = await fetchWithAuth('/api/matches/upcoming');
+        if (!response || !response.ok) throw new Error('Error fetching matches');
+        
+        const matches = await response.json();
+        displayUpcomingMatches(matches);
+    } catch (error) {
+        console.error('Error cargando próximos partidos:', error);
+        container.innerHTML = `<div class="no-data"><p>No se pudieron cargar los partidos.</p></div>`;
+    }
 }
 
-// Carga las predicciones que ya hizo el usuario
+async function displayUpcomingMatches(matches) {
+    const container = document.getElementById('upcomingMatches');
+    if (!matches || matches.length === 0) {
+        container.innerHTML = `<div class="no-data"><p>📅 No hay partidos programados por el momento.</p></div>`;
+        return;
+    }
+
+    const predictionsResponse = await fetchWithAuth('/api/predictions/user');
+    const userPredictions = predictionsResponse.ok ? await predictionsResponse.json() : [];
+    const predictionsMap = new Map(userPredictions.map(p => [p.match_id, p]));
+
+    container.innerHTML = matches.map(match => {
+        const prediction = predictionsMap.get(match.id);
+        const hasPrediction = !!prediction;
+        return `
+            <div class="match-card" data-match-id="${match.id}">
+                <div class="match-info">
+                    <div class="teams"><span class="team">${match.home_team}</span> <span class="vs">vs</span> <span class="team">${match.away_team}</span></div>
+                    <div class="match-date">${formatFullDate(match.match_date)}</div>
+                    ${hasPrediction ? `<div class="existing-prediction"><small>Tu predicción: ${prediction.predicted_home_score} - ${prediction.predicted_away_score}</small></div>` : ''}
+                </div>
+                <div class="match-actions">
+                    <button class="btn ${hasPrediction ? 'btn-secondary' : 'btn-primary'} btn-small" onclick="showPredictionForm('${match.id}', '${match.home_team}', '${match.away_team}', ${hasPrediction ? `'${prediction.predicted_home_score}', '${prediction.predicted_away_score}'` : 'null, null'})">
+                        ${hasPrediction ? 'Editar' : 'Predecir'}
+                    </button>
+                </div>
+            </div>`;
+    }).join('');
+}
+
 async function loadUserPredictions() {
-    // ...
+    const container = document.getElementById('myPredictions');
+    try {
+        const response = await fetchWithAuth(`/api/predictions/user`);
+        if(!response || !response.ok) throw new Error('Error fetching user predictions');
+        const predictions = await response.json();
+
+        if (!predictions || predictions.length === 0) {
+            container.innerHTML = `<div class="no-data"><p>📝 Aún no has hecho predicciones.</p></div>`;
+            return;
+        }
+
+        container.innerHTML = predictions.map(p => `
+            <div class="prediction-card">
+                <div class="prediction-match"><strong>${p.home_team} vs ${p.away_team}</strong><small>${formatFullDate(p.match_date)}</small></div>
+                <div class="prediction-details">
+                    <span class="prediction-score">Tu pronóstico: ${p.predicted_home_score} - ${p.predicted_away_score}</span>
+                    <span class="prediction-points ${p.status === 'finished' ? (p.points_earned > 0 ? 'points-earned' : 'points-zero') : ''}">
+                        ${p.status === 'finished' ? `${p.points_earned || 0} pts` : 'Pendiente'}
+                    </span>
+                </div>
+            </div>
+        `).join('');
+
+    } catch(error) {
+        console.error('Error cargando predicciones de usuario:', error);
+        container.innerHTML = `<div class="no-data"><p>Error al cargar tus predicciones.</p></div>`;
+    }
 }
 
+// --- FIN NUEVAS FUNCIONES ---
 
-// Deshabilita secciones si la cuenta no está activa o no hay torneo
 function disableFeaturesForInactiveUser() {
     document.getElementById('upcomingMatches').innerHTML = `<div class="disabled-section"><p>Activa tu cuenta para ver y predecir partidos.</p></div>`;
     document.getElementById('myPredictions').innerHTML = `<div class="disabled-section"><p>Activa tu cuenta para ver tus predicciones.</p></div>`;
 }
 
-// Funciones de formato y utilidad
 function formatSimpleDate(dateString) {
     if (!dateString) return "Fecha inválida";
-    const date = new Date(dateString);
-    return date.toLocaleDateString('es-ES', { month: 'long', day: 'numeric' });
+    return new Date(dateString).toLocaleDateString('es-ES', { month: 'short', day: 'numeric' });
 }
 
-function logout() {
+function formatFullDate(dateString) {
+    if (!dateString) return "Fecha inválida";
+    return new Date(dateString).toLocaleString('es-ES', { dateStyle: 'medium', timeStyle: 'short' });
+}
+
+window.logout = function() {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     window.location.href = '/index.html';
+}
+
+window.showPredictionForm = function(matchId, homeTeam, awayTeam, homeScore, awayScore) {
+    closePredictionModal(); // Cierra cualquier modal abierto
+    const modal = document.createElement('div');
+    modal.className = 'prediction-modal';
+    modal.innerHTML = `
+    <div class="modal-content">
+        <div class="modal-header"><h3>Hacer Predicción</h3><button class="close-modal" onclick="closePredictionModal()">&times;</button></div>
+        <div class="modal-body">
+            <div class="match-title"><strong>${homeTeam} vs ${awayTeam}</strong></div>
+            <form id="predictionForm" onsubmit="submitPrediction(event, '${matchId}')">
+                <div class="score-inputs">
+                    <div class="score-input"><label>${homeTeam}</label><input type="number" name="homeScore" min="0" max="20" value="${homeScore !== 'null' ? homeScore : 0}" required></div>
+                    <div class="score-separator">-</div>
+                    <div class="score-input"><label>${awayTeam}</label><input type="number" name="awayScore" min="0" max="20" value="${awayScore !== 'null' ? awayScore : 0}" required></div>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closePredictionModal()">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>`;
+    document.body.appendChild(modal);
+}
+
+window.closePredictionModal = function() {
+    const modal = document.querySelector('.prediction-modal');
+    if (modal) modal.remove();
+}
+
+window.submitPrediction = async function(event, matchId) {
+    event.preventDefault();
+    const form = event.target;
+    const homeScore = form.querySelector('input[name="homeScore"]').value;
+    const awayScore = form.querySelector('input[name="awayScore"]').value;
+
+    const response = await fetchWithAuth('/api/predictions', {
+        method: 'POST',
+        body: JSON.stringify({
+            match_id: matchId,
+            predicted_home_score: parseInt(homeScore),
+            predicted_away_score: parseInt(awayScore)
+        })
+    });
+
+    if (response && response.ok) {
+        alert('¡Predicción guardada!');
+        closePredictionModal();
+        await loadUpcomingMatches(); // Recarga partidos para mostrar "Editar"
+        await loadUserPredictions(); // Recarga la lista de predicciones
+    } else {
+        const error = await response.json();
+        alert(`Error: ${error.error}`);
+    }
 }
