@@ -5,13 +5,14 @@ const { authenticateToken } = require('./auth');
 const router = express.Router();
 
 // GET /api/matches/upcoming - Partidos próximos para usuarios
+// GET /api/matches/upcoming - Partidos próximos para usuarios (MEJORADA)
 router.get('/upcoming', authenticateToken, async (req, res) => {
     console.log('🔍 GET /matches/upcoming solicitado');
     
     try {
         const { db } = require('../database');
         
-        // Query simplificada que funciona en PostgreSQL
+        // NUEVA CONSULTA: Incluye verificación de torneo activo
         const query = `
             SELECT 
                 m.id,
@@ -21,33 +22,45 @@ router.get('/upcoming', authenticateToken, async (req, res) => {
                 m.home_score,
                 m.away_score,
                 m.status,
+                m.tournament_id,
+                m.phase_id,
                 COALESCE(tp.name, 'Sin fase') as phase_name,
                 COALESCE(tp.points_multiplier, 1) as points_multiplier,
                 COALESCE(tp.is_eliminatory, 0) as is_eliminatory,
                 COALESCE(tp.result_points, 1) as result_points,
-                COALESCE(tp.exact_score_points, 3) as exact_score_points
+                COALESCE(tp.exact_score_points, 3) as exact_score_points,
+                t.name as tournament_name,
+                t.status as tournament_status
             FROM matches_new m
             LEFT JOIN tournament_phases tp ON m.phase_id = tp.id
-            WHERE m.status = 'scheduled'
+            LEFT JOIN tournaments t ON m.tournament_id = t.id
+            WHERE t.status = 'active' 
+            AND m.status IN ('scheduled', 'upcoming')
+            AND m.match_date > NOW()
             ORDER BY m.match_date ASC
             LIMIT 20
         `;
         
+        console.log('🔧 Ejecutando query para partidos próximos...');
+        
         db.all(query, [], (err, matches) => {
             if (err) {
                 console.error('❌ Error obteniendo partidos próximos:', err);
-                return res.json([]); // Array vacío, no error 500
+                return res.json({ matches: [], error: err.message });
             }
             
             console.log(`✅ Partidos próximos encontrados: ${matches ? matches.length : 0}`);
+            console.log('📊 Primeros partidos:', matches?.slice(0, 3));
+            
             res.json(matches || []);
         });
         
     } catch (error) {
         console.error('❌ Error en route matches/upcoming:', error);
-        res.json([]);
+        res.json({ matches: [], error: error.message });
     }
 });
+
 
 
 // GET /api/matches - Todos los partidos (para admin)
@@ -276,6 +289,60 @@ router.get('/active-tournament', async (req, res) => {
         res.status(500).json({ error: 'Error interno del servidor' });
     }
 });
+
+// GET /api/matches/debug - Ruta temporal para debugging
+router.get('/debug', authenticateToken, async (req, res) => {
+    try {
+        const { db } = require('../database');
+        
+        console.log('🐛 Debugging: Verificando estado de la base de datos...');
+        
+        // 1. Verificar torneos
+        db.get('SELECT * FROM tournaments WHERE status = ?', ['active'], (err, activeTournament) => {
+            if (err) {
+                return res.json({ error: 'Error consultando torneos', details: err.message });
+            }
+            
+            // 2. Contar todos los partidos
+            db.get('SELECT COUNT(*) as total FROM matches_new', [], (err2, totalMatches) => {
+                if (err2) {
+                    return res.json({ error: 'Error contando partidos', details: err2.message });
+                }
+                
+                // 3. Partidos por estado
+                db.all(`
+                    SELECT status, COUNT(*) as count 
+                    FROM matches_new 
+                    GROUP BY status
+                `, [], (err3, statusCounts) => {
+                    if (err3) {
+                        return res.json({ error: 'Error agrupando por estado', details: err3.message });
+                    }
+                    
+                    // 4. Algunos partidos de ejemplo
+                    db.all('SELECT * FROM matches_new LIMIT 5', [], (err4, sampleMatches) => {
+                        if (err4) {
+                            return res.json({ error: 'Error obteniendo ejemplos', details: err4.message });
+                        }
+                        
+                        res.json({
+                            activeTournament,
+                            totalMatches,
+                            statusCounts,
+                            sampleMatches,
+                            timestamp: new Date().toISOString()
+                        });
+                    });
+                });
+            });
+        });
+        
+    } catch (error) {
+        console.error('❌ Error en debugging:', error);
+        res.json({ error: 'Error general', details: error.message });
+    }
+});
+
 
 
 

@@ -152,19 +152,30 @@ async function loadLeaderboard() {
 
 // --- ¡NUEVAS FUNCIONES! ---
 
+// En dashboard.js, reemplaza la función loadUpcomingMatches:
 async function loadUpcomingMatches() {
     const container = document.getElementById('upcomingMatches');
+    
     try {
+        console.log('🔍 Solicitando partidos próximos...');
+        
         const response = await fetchWithAuth('/api/matches/upcoming');
-        if (!response || !response.ok) throw new Error('Error fetching matches');
+        if (!response || !response.ok) {
+            console.error('❌ Error en respuesta:', response?.status);
+            throw new Error('Error fetching matches');
+        }
         
         const matches = await response.json();
+        console.log('📊 Partidos recibidos:', matches);
+        console.log('📊 Cantidad de partidos:', matches?.length);
+        
         displayUpcomingMatches(matches);
     } catch (error) {
-        console.error('Error cargando próximos partidos:', error);
+        console.error('❌ Error cargando próximos partidos:', error);
         container.innerHTML = `<div class="no-data"><p>No se pudieron cargar los partidos.</p></div>`;
     }
 }
+
 
 async function displayUpcomingMatches(matches) {
     const container = document.getElementById('upcomingMatches');
