@@ -54,41 +54,85 @@ function showTab(tabName) {
             loadAllUsers();
             break;
     }
-}
+
+
+// Función para manejar errores 401 automáticamente
+async function fetchWithAuth(url, options = {}) {
+    const token = localStorage.getItem('token');
+    
+    const defaultOptions = {
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            ...options.headers
+        },
+        ...options
+    };
+
+    try {
+        const response = await fetch(url, defaultOptions);
+        
+        // Si token expiró, redirigir a login
+        if (response.status === 401) {
+            console.log('🔐 Token expirado, redirigiendo a login...');
+            localStorage.removeItem('token');
+            alert('Tu sesión ha expirado. Por favor, inicia sesión de nuevo.');
+            window.location.href = '/login.html';
+            return null;
+        }
+        
+        return response;
+    } catch (error) {
+        console.error('Error en fetchWithAuth:', error);
+        throw error;
+    }
+}}
 
 // ============= FUNCIONES EXISTENTES (Stats y Users) =============
 
 async function loadStats() {
     try {
-        const response = await fetch('/api/auth/stats');
-        const stats = await response.json();
-
-        document.getElementById('totalUsers').textContent = stats.total_users || 0;
-        document.getElementById('activeUsers').textContent = stats.active_users || 0;
-        document.getElementById('pendingUsers').textContent = (stats.total_users - stats.active_users) || 0;
+        console.log('📊 Cargando estadísticas...');
+        
+        const response = await fetchWithAuth('/api/auth/stats');
+        if (!response) return; // Token expirado, ya se manejó
+        
+        if (response.ok) {
+            const stats = await response.json();
+            console.log('✅ Estadísticas cargadas:', stats);
+            
+            document.getElementById('totalUsers').textContent = stats.total_users || 0;
+            document.getElementById('activeUsers').textContent = stats.active_users || 0;
+        } else {
+            console.error('Error cargando estadísticas:', response.status);
+            document.getElementById('totalUsers').textContent = '?';
+            document.getElementById('activeUsers').textContent = '?';
+        }
     } catch (error) {
-        console.error('Error cargando estadísticas:', error);
+        console.error('Error en loadStats:', error);
+        document.getElementById('totalUsers').textContent = '?';
+        document.getElementById('activeUsers').textContent = '?';
     }
 }
 
+
 async function loadPendingUsers() {
     try {
-        const token = localStorage.getItem('token');
-        const response = await fetch('/api/auth/pending-users', {
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
-        });
-
+        console.log('👥 Cargando usuarios pendientes...');
+        
+        const response = await fetchWithAuth('/api/auth/pending-users');
+        if (!response) return; // Token expirado
+        
         if (response.ok) {
             const users = await response.json();
-            displayPendingUsers(users);
+            displayPendingUsers(users || []);
         } else {
-            document.getElementById('pendingUsersList').innerHTML = '<p>Error cargando usuarios pendientes</p>';
+            console.error('Error cargando usuarios pendientes:', response.status);
+            displayPendingUsers([]);
         }
     } catch (error) {
-        console.error('Error cargando usuarios pendientes:', error);
-        document.getElementById('pendingUsersList').innerHTML = '<p>No se pudieron cargar los usuarios pendientes</p>';
+        console.error('Error en loadPendingUsers:', error);
+        displayPendingUsers([]);
     }
 }
 
