@@ -183,24 +183,37 @@ async function displayUpcomingMatches(matches) {
     }).join('');
 }
 
+// Reemplaza la función existente en public/dashboard.js
 async function loadUserPredictions() {
     const container = document.getElementById('myPredictions');
     try {
+        // ✅ CORRECCIÓN: Nos aseguramos de llamar a la ruta correcta '/api/predictions/user'
         const response = await fetchWithAuth(`/api/predictions/user`);
-        if(!response || !response.ok) throw new Error('Error fetching user predictions');
+        
+        // Si el token expiró, la función devuelve null y paramos aquí.
+        if (!response) return;
+
+        if (!response.ok) {
+            // Si el servidor responde con un error (ej. 500), lo mostramos.
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Respuesta no válida del servidor');
+        }
+        
         const predictions = await response.json();
 
+        // ✅ MEJORA: Manejo explícito de cuando no hay predicciones.
         if (!predictions || predictions.length === 0) {
-            container.innerHTML = `<div class="no-data"><p>📝 Aún no has hecho predicciones.</p></div>`;
+            container.innerHTML = `<div class="no-data"><p>📝 Aún no has hecho predicciones.</p><small>Tus predicciones aparecerán aquí.</small></div>`;
             return;
         }
 
+        // Si hay predicciones, las mostramos.
         container.innerHTML = predictions.map(p => `
             <div class="prediction-card">
                 <div class="prediction-match"><strong>${p.home_team} vs ${p.away_team}</strong><small>${formatFullDate(p.match_date)}</small></div>
                 <div class="prediction-details">
                     <span class="prediction-score">Tu pronóstico: ${p.predicted_home_score} - ${p.predicted_away_score}</span>
-                    <span class="prediction-points ${p.status === 'finished' ? (p.points_earned > 0 ? 'points-earned' : 'points-zero') : ''}">
+                    <span class="prediction-points ${p.status === 'finished' ? (p.points_earned > 0 ? 'points-earned' : '') : ''}">
                         ${p.status === 'finished' ? `${p.points_earned || 0} pts` : 'Pendiente'}
                     </span>
                 </div>
@@ -209,9 +222,10 @@ async function loadUserPredictions() {
 
     } catch(error) {
         console.error('Error cargando predicciones de usuario:', error);
-        container.innerHTML = `<div class="no-data"><p>Error al cargar tus predicciones.</p></div>`;
+        container.innerHTML = `<div class="no-data"><p>Error al cargar tus predicciones.</p><button class="btn btn-secondary btn-small" onclick="loadUserPredictions()">Reintentar</button></div>`;
     }
 }
+
 
 // --- FIN NUEVAS FUNCIONES ---
 
