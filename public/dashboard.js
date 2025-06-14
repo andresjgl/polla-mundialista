@@ -81,18 +81,38 @@ async function loadActiveTournament() {
 
 function displayActiveTournament(tournament) {
     const container = document.getElementById('activeTournamentInfo');
-    const progress = tournament.total_matches > 0 ? Math.round((tournament.finished_matches / tournament.total_matches) * 100) : 0;
+    
+    // ✅ MEJORA: Usamos el operador '||' para poner un valor por defecto si algo viene undefined.
+    const tournamentName = tournament.name || "Torneo sin nombre";
+    const totalMatches = tournament.total_matches || 0;
+    const finishedMatches = tournament.finished_matches || 0;
+    const totalPredictions = tournament.total_predictions || 0;
+    
+    const progress = totalMatches > 0 ? Math.round((finishedMatches / totalMatches) * 100) : 0;
+
     container.innerHTML = `
-        <div class="tournament-active-header"><h3>🏆 ${tournament.name}</h3><span class="tournament-status-badge active">ACTIVO</span></div>
+        <div class="tournament-active-header">
+            <h3>🏆 ${tournamentName}</h3>
+            <span class="tournament-status-badge active">ACTIVO</span>
+        </div>
         <div class="tournament-stats">
             <div class="tournament-stat">
                 <span class="stat-label">Progreso</span>
-                <div class="progress-bar"><div class="progress-fill" style="width: ${progress}%;"></div></div>
-                <span class="stat-value">${tournament.finished_matches}/${tournament.total_matches} partidos</span>
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: ${progress}%;"></div>
+                </div>
+                <span class="stat-value">${finishedMatches}/${totalMatches} partidos</span>
             </div>
-            <div class="tournament-stat"><span class="stat-label">Predicciones</span><span class="stat-value">${tournament.total_predictions}</span></div>
-            <div class="tournament-stat"><span class="stat-label">Período</span><span class="stat-value">${formatSimpleDate(tournament.start_date)} - ${formatSimpleDate(tournament.end_date)}</span></div>
-        </div>`;
+            <div class="tournament-stat">
+                <span class="stat-label">Predicciones Totales</span>
+                <span class="stat-value">${totalPredictions}</span>
+            </div>
+            <div class="tournament-stat">
+                <span class="stat-label">Período</span>
+                <span class="stat-value">${formatSimpleDate(tournament.start_date)} - ${formatSimpleDate(tournament.end_date)}</span>
+            </div>
+        </div>
+    `;
 }
 
 function displayNoActiveTournament() {

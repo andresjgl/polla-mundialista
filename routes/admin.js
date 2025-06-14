@@ -1296,44 +1296,50 @@ router.post('/matches', authenticateToken, requireAdmin, async (req, res) => {
 });
 
 // GET /api/admin/active-tournament - Obtener torneo activo
-router.get('/active-tournament', async (req, res) => {
-    try {
-        const { db } = require('../database');
+// GET /api/admin/active-tournament - Obtener torneo activo con datos robustos
+router.get('/active-tournament', (req, res) => {
+    // ✅ MEJORA: Se usa COALESCE para convertir los NULL a 0 directamente en la consulta.
+    const query = `
+        SELECT 
+            t.*, 
+            COALESCE(m.total_matches, 0) as total_matches,
+            COALESCE(m.finished_matches, 0) as finished_matches,
+            COALESCE(p.total_predictions, 0) as total_predictions
+        FROM tournaments t
+        LEFT JOIN (
+            SELECT 
+                tournament_id, 
+                COUNT(*) as total_matches,
+                COUNT(CASE WHEN status = 'finished' THEN 1 END) as finished_matches
+            FROM matches_new
+            GROUP BY tournament_id
+        ) m ON t.id = m.tournament_id
+        LEFT JOIN (
+            SELECT 
+                m.tournament_id, 
+                COUNT(p.id) as total_predictions 
+            FROM predictions_new p
+            JOIN matches_new m ON p.match_id = m.id
+            GROUP BY m.tournament_id
+        ) p ON t.id = p.tournament_id
+        WHERE t.status = 'active'
+        LIMIT 1;
+    `;
+    
+    db.get(query, [], (err, tournament) => {
+        if (err) {
+            console.error('Error obteniendo torneo activo:', err);
+            return res.status(500).json({ error: 'Error interno del servidor' });
+        }
         
-        db.get(`
-            SELECT t.*, 
-                   COUNT(m.id) as total_matches,
-                   COUNT(CASE WHEN m.status = 'finished' THEN 1 END) as finished_matches,
-                   COUNT(p.id) as total_predictions
-            FROM tournaments t
-            LEFT JOIN matches_new m ON t.id = m.tournament_id
-            LEFT JOIN predictions_new p ON m.id = p.match_id
-            WHERE t.status = 'active'
-            GROUP BY t.id
-            LIMIT 1
-        `, (err, tournament) => {
-            if (err) {
-                console.error('Error obteniendo torneo activo:', err);
-                return res.status(500).json({ error: 'Error interno del servidor' });
-            }
-            
-            if (!tournament) {
-                return res.json({ 
-                    active_tournament: null,
-                    message: 'No hay torneo activo'
-                });
-            }
-            
-            res.json({ 
-                active_tournament: tournament,
-                message: 'Torneo activo encontrado'
-            });
+        // La respuesta siempre contendrá el objeto del torneo o null si no hay ninguno activo.
+        res.json({ 
+            active_tournament: tournament || null,
+            message: tournament ? 'Torneo activo encontrado' : 'No hay torneo activo'
         });
-    } catch (error) {
-        console.error('Error obteniendo torneo activo:', error);
-        res.status(500).json({ error: 'Error interno del servidor' });
-    }
+    });
 });
+
 
 
 module.exports = router;
