@@ -313,12 +313,32 @@ function disableFeaturesForInactiveUser() {
 
 function formatSimpleDate(dateString) {
     if (!dateString) return "Fecha inválida";
-    return new Date(dateString).toLocaleDateString('es-ES', { month: 'short', day: 'numeric' });
+    
+    try {
+        const date = new Date(dateString);
+        return date.toLocaleDateString('es-CO', { 
+            month: 'short', 
+            day: 'numeric',
+            timeZone: 'America/Bogota'
+        });
+    } catch (error) {
+        return "Fecha inválida";
+    }
 }
 
 function formatFullDate(dateString) {
     if (!dateString) return "Fecha inválida";
-    return new Date(dateString).toLocaleString('es-ES', { dateStyle: 'medium', timeStyle: 'short' });
+    
+    try {
+        const date = new Date(dateString);
+        return date.toLocaleString('es-CO', { 
+            dateStyle: 'medium', 
+            timeStyle: 'short',
+            timeZone: 'America/Bogota'
+        });
+    } catch (error) {
+        return "Fecha inválida";
+    }
 }
 
 window.logout = function() {

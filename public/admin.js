@@ -839,6 +839,8 @@ function displayMatches(matches) {
 }
 
 
+// Reemplaza formatDateTime en admin.js:
+
 function formatDateTime(dateString) {
     if (!dateString) return 'Sin fecha';
     
@@ -846,19 +848,21 @@ function formatDateTime(dateString) {
         const date = new Date(dateString);
         if (isNaN(date.getTime())) return 'Fecha inválida';
         
-        return date.toLocaleDateString('es-ES', {
+        return date.toLocaleDateString('es-CO', {
             day: '2-digit',
             month: '2-digit', 
-            year: 'numeric'
-        }) + ' ' + date.toLocaleTimeString('es-ES', { 
+            year: 'numeric',
+            timeZone: 'America/Bogota'
+        }) + ' ' + date.toLocaleTimeString('es-CO', { 
             hour: '2-digit', 
-            minute: '2-digit' 
+            minute: '2-digit',
+            timeZone: 'America/Bogota'
         });
     } catch (error) {
-        console.warn('Error formateando fecha:', error);
         return 'Fecha inválida';
     }
 }
+
 
 function getMatchStatusText(status) {
     const statusMap = {
