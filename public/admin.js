@@ -747,10 +747,11 @@ async function loadMatches() {
     }
 }
 
+// Función displayMatches mejorada en admin.js
 function displayMatches(matches) {
     const container = document.getElementById('matchesList');
 
-    if (matches.length === 0) {
+    if (!matches || matches.length === 0) {
         container.innerHTML = `
             <div class="no-data">
                 <p>⚽ No hay partidos creados</p>
@@ -760,43 +761,103 @@ function displayMatches(matches) {
         return;
     }
 
-    const matchesHTML = matches.map(match => `
-        <div class="match-card-admin">
-            <div class="match-grid">
-                <div class="match-teams">
-                    ${match.home_team} vs ${match.away_team}
-                    <small>${match.phase_name} (${match.points_multiplier}x puntos)</small>
-                </div>
-                <div class="match-date">
-                    ${formatDateTime(match.match_date)}
-                </div>
-                <div class="match-score ${match.status}">
-                    ${match.status === 'finished' ?
-            `${match.home_score || 0} - ${match.away_score || 0}` :
-            getMatchStatusText(match.status)
+    console.log('🎯 Renderizando partidos:', matches.length);
+    console.log('🎯 Primer partido:', matches[0]);
+
+    const matchesHTML = matches.map(match => {
+        // MANEJO DEFENSIVO DE VALORES UNDEFINED/NULL
+        const phaseName = match.phase_name || 'Sin fase';
+        const pointsMultiplier = match.points_multiplier || 1;
+        const predictionsCount = match.predictions_count || 0;
+        const tournamentName = match.tournament_name || 'Sin torneo';
+        
+        // Formatear fecha de manera segura
+        let formattedDate = 'Fecha inválida';
+        try {
+            formattedDate = formatDateTime(match.match_date);
+        } catch (e) {
+            console.warn('Error formateando fecha:', match.match_date);
         }
-                </div>
-                <div class="match-actions">
-                    <small>${match.predictions_count} predicciones</small>
-                    ${match.status === 'scheduled' ?
-            `<button class="btn btn-primary btn-small" onclick="updateMatchResult('${match.id}', '${match.home_team}', '${match.away_team}')">
-                            Actualizar Resultado
-                        </button>` :
-            `<button class="btn btn-secondary btn-small" onclick="viewMatchDetails('${match.id}')">
-                            Ver Detalles
-                        </button>`
+
+        // Estado del partido de manera segura
+        const status = match.status || 'scheduled';
+        const statusText = getMatchStatusText(status);
+
+        // Resultado del partido
+        let scoreDisplay;
+        if (status === 'finished' && match.home_score !== null && match.away_score !== null) {
+            scoreDisplay = `${match.home_score || 0} - ${match.away_score || 0}`;
+        } else {
+            scoreDisplay = statusText;
         }
+
+        return `
+            <div class="match-card-admin" data-match-id="${match.id}">
+                <div class="match-grid">
+                    <div class="match-teams">
+                        <div class="teams-line">
+                            <strong>${match.home_team || 'Equipo Local'} vs ${match.away_team || 'Equipo Visitante'}</strong>
+                        </div>
+                        <small class="match-details">
+                            📋 ${phaseName} (${pointsMultiplier}x puntos) - ${tournamentName}
+                        </small>
+                    </div>
+                    
+                    <div class="match-date">
+                        <span class="date-text">${formattedDate}</span>
+                    </div>
+                    
+                    <div class="match-score ${status}">
+                        <span class="score-text">${scoreDisplay}</span>
+                    </div>
+                    
+                    <div class="match-actions">
+                        <div class="predictions-info">
+                            <small>${predictionsCount} predicción${predictionsCount !== 1 ? 'es' : ''}</small>
+                        </div>
+                        <div class="action-buttons">
+                            ${status === 'scheduled' ? `
+                                <button class="btn btn-primary btn-small" 
+                                        onclick="updateMatchResult('${match.id}', '${match.home_team}', '${match.away_team}')">
+                                    Actualizar Resultado
+                                </button>
+                            ` : `
+                                <button class="btn btn-secondary btn-small" 
+                                        onclick="viewMatchDetails('${match.id}')">
+                                    Ver Detalles
+                                </button>
+                            `}
+                        </div>
+                    </div>
                 </div>
             </div>
-        </div>
-    `).join('');
+        `;
+    }).join('');
 
     container.innerHTML = matchesHTML;
+    console.log('✅ Partidos renderizados correctamente');
 }
 
+
 function formatDateTime(dateString) {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('es-ES') + ' ' + date.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+    if (!dateString) return 'Sin fecha';
+    
+    try {
+        const date = new Date(dateString);
+        if (isNaN(date.getTime())) return 'Fecha inválida';
+        
+        return date.toLocaleDateString('es-ES', {
+            day: '2-digit',
+            month: '2-digit', 
+            year: 'numeric'
+        }) + ' ' + date.toLocaleTimeString('es-ES', { 
+            hour: '2-digit', 
+            minute: '2-digit' 
+        });
+    } catch (error) {
+        console.warn('Error formateando fecha:', error);
+        return 'Fecha inválida';
+    }
 }
 
 function getMatchStatusText(status) {
@@ -807,7 +868,7 @@ function getMatchStatusText(status) {
         'postponed': '⏸️ Pospuesto',
         'cancelled': '❌ Cancelado'
     };
-    return statusMap[status] || status;
+    return statusMap[status] || status || 'Estado desconocido';
 }
 
 async function updateMatchResult(matchId, homeTeam, awayTeam) {
@@ -1891,6 +1952,13 @@ function loadAllUsers() {
     alert('Funcionalidad próximamente: Gestión completa de usuarios');
 }
 
+// Función placeholder para ver detalles (mejorada)
 function viewMatchDetails(matchId) {
+    console.log(`🔍 Ver detalles del partido: ${matchId}`);
     alert(`Funcionalidad próximamente: Ver detalles del partido ${matchId}`);
+    
+    // TODO: Implementar modal con:
+    // - Todas las predicciones del partido
+    // - Estadísticas de aciertos
+    // - Distribución de predicciones
 }

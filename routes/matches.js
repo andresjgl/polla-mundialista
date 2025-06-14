@@ -204,15 +204,14 @@ router.post('/:matchId/result', authenticateToken, requireAdmin, async (req, res
 });
 
 
-// GET /api/matches/with-predictions - Partidos con conteo de predicciones (admin)
-// GET /api/matches/with-predictions - Obtener partidos con predicciones
+// GET /api/matches/with-predictions - Obtener partidos con predicciones (CORREGIDA)
 router.get('/with-predictions', authenticateToken, requireAdmin, async (req, res) => {
     console.log('🔍 GET /matches/with-predictions solicitado');
     
     try {
         const { db } = require('../database');
         
-        // Query simplificada que funciona en PostgreSQL
+        // CONSULTA COMPLETA CON TODOS LOS CAMPOS NECESARIOS
         const query = `
             SELECT 
                 m.id,
@@ -222,14 +221,23 @@ router.get('/with-predictions', authenticateToken, requireAdmin, async (req, res
                 m.home_score,
                 m.away_score,
                 m.status,
+                m.tournament_id,
+                m.phase_id,
                 COALESCE(t.name, 'Sin torneo') as tournament_name,
-                COALESCE(tp.name, 'Sin fase') as phase_name
+                COALESCE(tp.name, 'Sin fase') as phase_name,
+                COALESCE(tp.points_multiplier, 1) as points_multiplier,
+                COALESCE(tp.result_points, 1) as result_points,
+                COALESCE(tp.exact_score_points, 3) as exact_score_points,
+                COALESCE(tp.is_eliminatory, false) as is_eliminatory,
+                (SELECT COUNT(*) FROM predictions_new p WHERE p.match_id = m.id) as predictions_count
             FROM matches_new m
             LEFT JOIN tournaments t ON m.tournament_id = t.id
             LEFT JOIN tournament_phases tp ON m.phase_id = tp.id
             ORDER BY m.match_date DESC
             LIMIT 50
         `;
+        
+        console.log('🔧 Ejecutando consulta completa de partidos...');
         
         db.all(query, [], (err, matches) => {
             if (err) {
@@ -239,6 +247,16 @@ router.get('/with-predictions', authenticateToken, requireAdmin, async (req, res
             }
             
             console.log(`✅ Partidos encontrados: ${matches ? matches.length : 0}`);
+            if (matches && matches.length > 0) {
+                console.log('📊 Primer partido con datos:', {
+                    id: matches[0].id,
+                    teams: `${matches[0].home_team} vs ${matches[0].away_team}`,
+                    phase_name: matches[0].phase_name,
+                    points_multiplier: matches[0].points_multiplier,
+                    predictions_count: matches[0].predictions_count
+                });
+            }
+            
             res.json(matches || []);
         });
         
@@ -247,6 +265,7 @@ router.get('/with-predictions', authenticateToken, requireAdmin, async (req, res
         res.json([]);
     }
 });
+
 
 
 // AGREGAR esta ruta en routes/matches.js:
