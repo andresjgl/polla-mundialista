@@ -220,7 +220,7 @@ router.post('/tournaments/:id/phases', authenticateToken, requireAdmin, async (r
 });
 
 
-// PUT /api/admin/phases/:id - Editar fase
+// PUT /api/admin/phases/:id - Editar fase (CORREGIDA PARA POSTGRESQL)
 router.put('/phases/:id', authenticateToken, requireAdmin, async (req, res) => {
     try {
         const { id } = req.params;
@@ -235,6 +235,11 @@ router.put('/phases/:id', authenticateToken, requireAdmin, async (req, res) => {
             top_scorer_points,
             description 
         } = req.body;
+
+        console.log(`🔧 Actualizando fase ${id} con datos:`, {
+            name, points_multiplier, order_index, is_eliminatory,
+            result_points, exact_score_points, winner_points, top_scorer_points
+        });
 
         if (!name || !points_multiplier || order_index === undefined) {
             return res.status(400).json({ 
@@ -251,34 +256,54 @@ router.put('/phases/:id', authenticateToken, requireAdmin, async (req, res) => {
 
         const { db } = require('../database');
 
-        db.run(`
+        // CONSULTA CORREGIDA PARA POSTGRESQL
+        const updateQuery = `
             UPDATE tournament_phases 
-            SET name = ?, points_multiplier = ?, order_index = ?, 
-                is_eliminatory = ?, allows_draw = ?, result_points = ?, 
-                exact_score_points = ?, winner_points = ?, top_scorer_points = ?, 
-                description = ?, updated_at = datetime('now')
+            SET name = ?, 
+                points_multiplier = ?, 
+                order_index = ?, 
+                is_eliminatory = ?, 
+                allows_draw = ?, 
+                result_points = ?, 
+                exact_score_points = ?, 
+                winner_points = ?, 
+                top_scorer_points = ?, 
+                description = ?, 
+                updated_at = NOW()
             WHERE id = ?
-        `, [
-            name, points_multiplier, order_index, 
-            is_eliminatory ? 1 : 0, 
-            is_eliminatory ? 0 : 1, // allows_draw es lo opuesto a is_eliminatory
+        `;
+
+        const params = [
+            name, 
+            points_multiplier, 
+            order_index, 
+            is_eliminatory ? true : false,  // PostgreSQL boolean
+            is_eliminatory ? false : true,  // allows_draw es lo opuesto
             result_points || 1, 
             exact_score_points || 3, 
             winner_points || 0, 
             top_scorer_points || 0, 
             description || '', 
-            id
-        ], function(err) {
+            parseInt(id)  // Asegurar que es número
+        ];
+
+        console.log('🔧 Ejecutando query de actualización...');
+        console.log('📝 Parámetros:', params);
+
+        db.run(updateQuery, params, function(err) {
             if (err) {
-                console.error('Error actualizando fase:', err);
-                return res.status(500).json({ error: 'Error actualizando fase' });
+                console.error('❌ Error actualizando fase en BD:', err);
+                return res.status(500).json({ 
+                    error: 'Error actualizando fase: ' + err.message 
+                });
             }
 
             if (this.changes === 0) {
+                console.log('⚠️ No se encontró la fase para actualizar');
                 return res.status(404).json({ error: 'Fase no encontrada' });
             }
 
-            console.log(`✅ Fase ${name} actualizada exitosamente`);
+            console.log(`✅ Fase "${name}" actualizada exitosamente (${this.changes} cambios)`);
 
             res.json({
                 message: 'Fase actualizada exitosamente',
@@ -287,8 +312,8 @@ router.put('/phases/:id', authenticateToken, requireAdmin, async (req, res) => {
                     name,
                     points_multiplier,
                     order_index,
-                    is_eliminatory: is_eliminatory ? 1 : 0,
-                    allows_draw: is_eliminatory ? 0 : 1,
+                    is_eliminatory: is_eliminatory ? true : false,
+                    allows_draw: is_eliminatory ? false : true,
                     result_points: result_points || 1,
                     exact_score_points: exact_score_points || 3,
                     winner_points: winner_points || 0,
@@ -298,10 +323,13 @@ router.put('/phases/:id', authenticateToken, requireAdmin, async (req, res) => {
             });
         });
     } catch (error) {
-        console.error('Error actualizando fase:', error);
-        res.status(500).json({ error: 'Error interno del servidor' });
+        console.error('❌ Error general actualizando fase:', error);
+        res.status(500).json({ 
+            error: 'Error interno del servidor: ' + error.message 
+        });
     }
 });
+
 
 // DELETE /api/admin/phases/:id - Eliminar fase
 router.delete('/phases/:id', authenticateToken, requireAdmin, async (req, res) => {
@@ -394,21 +422,23 @@ router.post('/phases/validate-elimination', authenticateToken, requireAdmin, asy
     }
 });
 
-// POST /api/admin/tournaments/:id/phases/standard - Crear fases estándar con configuración avanzada
+// POST /api/admin/tournaments/:id/phases/standard - Crear fases estándar (CORREGIDA)
 router.post('/tournaments/:id/phases/standard', authenticateToken, requireAdmin, async (req, res) => {
     try {
         const { id } = req.params;
-        const { tournament_type = 'world_cup' } = req.body; // Permitir diferentes tipos de torneo
+        const { tournament_type = 'world_cup' } = req.body;
         const { db } = require('../database');
 
-        // Diferentes configuraciones según el tipo de torneo
+        console.log(`🏆 Creando fases estándar para torneo ${id}, tipo: ${tournament_type}`);
+
+        // CONFIGURACIONES MEJORADAS CON VALORES CORRECTOS
         const standardPhasesConfigs = {
             world_cup: [
                 { 
                     name: 'Fase de Grupos', 
                     points_multiplier: 1, 
                     order_index: 1,
-                    is_eliminatory: 0,
+                    is_eliminatory: false,
                     result_points: 1,
                     exact_score_points: 3,
                     description: 'Fase inicial donde los equipos compiten en grupos. Se permiten empates.'
@@ -417,16 +447,16 @@ router.post('/tournaments/:id/phases/standard', authenticateToken, requireAdmin,
                     name: 'Octavos de Final', 
                     points_multiplier: 4, 
                     order_index: 2,
-                    is_eliminatory: 1,
-                    result_points: 4,
-                    exact_score_points: 8,
+                    is_eliminatory: true,
+                    result_points: 4,        // ✅ VALOR CORRECTO
+                    exact_score_points: 8,   // ✅ VALOR CORRECTO
                     description: 'Primera fase eliminatoria. No se permiten empates, debe haber ganador.'
                 },
                 { 
                     name: 'Cuartos de Final', 
                     points_multiplier: 6, 
                     order_index: 3,
-                    is_eliminatory: 1,
+                    is_eliminatory: true,
                     result_points: 6,
                     exact_score_points: 12,
                     description: 'Segunda fase eliminatoria.'
@@ -435,7 +465,7 @@ router.post('/tournaments/:id/phases/standard', authenticateToken, requireAdmin,
                     name: 'Semifinal', 
                     points_multiplier: 8, 
                     order_index: 4,
-                    is_eliminatory: 1,
+                    is_eliminatory: true,
                     result_points: 8,
                     exact_score_points: 16,
                     description: 'Penúltima fase del torneo.'
@@ -444,7 +474,7 @@ router.post('/tournaments/:id/phases/standard', authenticateToken, requireAdmin,
                     name: 'Tercer Puesto', 
                     points_multiplier: 7, 
                     order_index: 5,
-                    is_eliminatory: 1,
+                    is_eliminatory: true,
                     result_points: 7,
                     exact_score_points: 14,
                     description: 'Partido por el tercer lugar.'
@@ -453,7 +483,7 @@ router.post('/tournaments/:id/phases/standard', authenticateToken, requireAdmin,
                     name: 'Final', 
                     points_multiplier: 10, 
                     order_index: 6,
-                    is_eliminatory: 1,
+                    is_eliminatory: true,
                     result_points: 10,
                     exact_score_points: 20,
                     winner_points: 15,
@@ -465,7 +495,7 @@ router.post('/tournaments/:id/phases/standard', authenticateToken, requireAdmin,
                     name: 'Fase de Grupos', 
                     points_multiplier: 1, 
                     order_index: 1,
-                    is_eliminatory: 0,
+                    is_eliminatory: false,
                     result_points: 1,
                     exact_score_points: 3,
                     description: 'Fase de grupos del Mundial de Clubes.'
@@ -474,7 +504,7 @@ router.post('/tournaments/:id/phases/standard', authenticateToken, requireAdmin,
                     name: 'Semifinal', 
                     points_multiplier: 5, 
                     order_index: 2,
-                    is_eliminatory: 1,
+                    is_eliminatory: true,
                     result_points: 5,
                     exact_score_points: 10,
                     description: 'Semifinales del Mundial de Clubes.'
@@ -483,7 +513,7 @@ router.post('/tournaments/:id/phases/standard', authenticateToken, requireAdmin,
                     name: 'Final', 
                     points_multiplier: 8, 
                     order_index: 3,
-                    is_eliminatory: 1,
+                    is_eliminatory: true,
                     result_points: 8,
                     exact_score_points: 16,
                     winner_points: 12,
@@ -500,20 +530,33 @@ router.post('/tournaments/:id/phases/standard', authenticateToken, requireAdmin,
         for (const phase of standardPhases) {
             try {
                 await new Promise((resolve, reject) => {
-                    db.run(`
+                    const insertQuery = `
                         INSERT INTO tournament_phases 
                         (tournament_id, name, points_multiplier, order_index, is_eliminatory, 
                          allows_draw, result_points, exact_score_points, winner_points, 
-                         top_scorer_points, description, created_at)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
-                    `, [
-                        id, phase.name, phase.points_multiplier, phase.order_index,
-                        phase.is_eliminatory, phase.is_eliminatory ? 0 : 1,
-                        phase.result_points, phase.exact_score_points,
-                        phase.winner_points || 0, phase.top_scorer_points || 0,
+                         top_scorer_points, description, created_at, updated_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+                    `;
+
+                    const params = [
+                        parseInt(id), 
+                        phase.name, 
+                        phase.points_multiplier, 
+                        phase.order_index,
+                        phase.is_eliminatory,
+                        !phase.is_eliminatory,  // allows_draw es lo opuesto
+                        phase.result_points,
+                        phase.exact_score_points,
+                        phase.winner_points || 0, 
+                        phase.top_scorer_points || 0,
                         phase.description
-                    ], function(err) {
+                    ];
+
+                    console.log(`🔧 Creando fase: ${phase.name} con puntos ${phase.result_points}/${phase.exact_score_points}`);
+
+                    db.run(insertQuery, params, function(err) {
                         if (err) {
+                            console.error(`❌ Error creando fase ${phase.name}:`, err);
                             reject(err);
                         } else {
                             console.log(`✅ Fase creada: ${phase.name} (ID: ${this.lastID})`);
@@ -536,10 +579,13 @@ router.post('/tournaments/:id/phases/standard', authenticateToken, requireAdmin,
         });
 
     } catch (error) {
-        console.error('Error creando fases estándar:', error);
-        res.status(500).json({ error: 'Error interno del servidor' });
+        console.error('❌ Error creando fases estándar:', error);
+        res.status(500).json({ 
+            error: 'Error interno del servidor: ' + error.message 
+        });
     }
 });
+
 
 // ============= GESTIÓN COMPLETA DE FASES =============
 
