@@ -1,4 +1,4 @@
-// public/dashboard.js - VERSIÓN COMPLETA (CON PARTIDOS Y PREDICCIONES)
+// public/dashboard.js - VERSIÓN FINAL CON LÓGICA DE CARGA CORREGIDA
 
 document.addEventListener('DOMContentLoaded', async () => {
     const token = localStorage.getItem('token');
@@ -8,20 +8,22 @@ document.addEventListener('DOMContentLoaded', async () => {
         window.location.href = '/login.html';
         return;
     }
-
     if (user.is_admin) {
         window.location.href = '/admin.html';
         return;
     }
 
     document.getElementById('userName').textContent = user.name || 'Usuario';
+    
+    // --- LÓGICA DE CARGA CORREGIDA ---
+    // 1. Primero, revisamos si la cuenta está activa.
     checkAccountStatus(user);
 
-    const activeTournament = await loadActiveTournament();
-    
-    if (activeTournament) {
-        // Solo cargar si la cuenta está activa
-        if(user.is_active) {
+    // 2. Si la cuenta está activa, procedemos a cargar el resto de datos.
+    if (user.is_active) {
+        const activeTournament = await loadActiveTournament();
+        // 3. Solo si hay un torneo, cargamos los datos dependientes.
+        if (activeTournament) {
             await loadUserStats(user.id);
             await loadUpcomingMatches();
             await loadUserPredictions();
@@ -30,41 +32,28 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 });
 
-async function fetchWithAuth(url, options = {}) {
-    const token = localStorage.getItem('token');
-    const defaultOptions = {
-        headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-            ...options.headers
-        },
-        ...options
-    };
-    const response = await fetch(url, defaultOptions);
-    if (response.status === 401) {
-        logout();
-        return null;
-    }
-    return response;
-}
-
+// Muestra si la cuenta está activa o pendiente
 function checkAccountStatus(user) {
     const statusBanner = document.getElementById('accountStatus');
     if (!user.is_active) {
         statusBanner.className = 'status-banner inactive';
         statusBanner.innerHTML = `<strong>⏳ Cuenta Pendiente de Activación</strong><br>Tu cuenta debe ser activada por un administrador.`;
-        disableFeaturesForInactiveUser();
+        disableFeaturesForInactiveUser(); // Deshabilita secciones si no está activo
     } else {
         statusBanner.className = 'status-banner active';
         statusBanner.innerHTML = `<strong>✅ Cuenta Activa</strong><br>¡Ya puedes hacer predicciones!`;
     }
 }
 
+// Carga la información del torneo activo
 async function loadActiveTournament() {
     try {
-        const response = await fetch('/api/admin/active-tournament');
-        if (!response.ok) throw new Error('No se pudo cargar el torneo');
+        const response = await fetchWithAuth('/api/admin/active-tournament');
+        if (!response) return null; // fetchWithAuth maneja el 401
+        if (!response.ok) throw new Error('Respuesta del servidor no fue OK');
+        
         const data = await response.json();
+        
         if (data.active_tournament) {
             displayActiveTournament(data.active_tournament);
             return data.active_tournament;
@@ -74,15 +63,15 @@ async function loadActiveTournament() {
         }
     } catch (error) {
         console.error('Error cargando torneo activo:', error);
-        displayNoActiveTournament();
+        displayNoActiveTournament(); // Muestra el mensaje correcto si hay error
         return null;
     }
 }
 
+// Muestra los datos del torneo activo
 function displayActiveTournament(tournament) {
     const container = document.getElementById('activeTournamentInfo');
     
-    // ✅ MEJORA: Usamos el operador '||' para poner un valor por defecto si algo viene undefined.
     const tournamentName = tournament.name || "Torneo sin nombre";
     const totalMatches = tournament.total_matches || 0;
     const finishedMatches = tournament.finished_matches || 0;
@@ -98,9 +87,7 @@ function displayActiveTournament(tournament) {
         <div class="tournament-stats">
             <div class="tournament-stat">
                 <span class="stat-label">Progreso</span>
-                <div class="progress-bar">
-                    <div class="progress-fill" style="width: ${progress}%;"></div>
-                </div>
+                <div class="progress-bar"><div class="progress-fill" style="width: ${progress}%;"></div></div>
                 <span class="stat-value">${finishedMatches}/${totalMatches} partidos</span>
             </div>
             <div class="tournament-stat">
@@ -115,10 +102,19 @@ function displayActiveTournament(tournament) {
     `;
 }
 
+// Muestra el mensaje de que no hay torneo activo
 function displayNoActiveTournament() {
-    document.getElementById('activeTournamentInfo').innerHTML = `<div class="no-active-tournament"><h3>⏸️ No hay torneo activo</h3><p>Las predicciones aparecerán cuando se active un torneo.</p></div>`;
-    disableFeaturesForInactiveUser();
+    document.getElementById('activeTournamentInfo').innerHTML = `<div class="no-active-tournament"><h3>⏸️ No hay torneo activo</h3><p>Las predicciones aparecerán aquí cuando se active un torneo.</p></div>`;
+    document.getElementById('upcomingMatches').innerHTML = `<div class="no-data"><p>No hay torneo activo.</p></div>`;
+    document.getElementById('myPredictions').innerHTML = `<div class="no-data"><p>No hay torneo activo.</p></div>`;
 }
+
+// Deshabilita secciones si el usuario no ha sido activado
+function disableFeaturesForInactiveUser() {
+    document.getElementById('upcomingMatches').innerHTML = `<div class="disabled-section"><p>Activa tu cuenta para ver y predecir partidos.</p></div>`;
+    document.getElementById('myPredictions').innerHTML = `<div class="disabled-section"><p>Activa tu cuenta para ver tus predicciones.</p></div>`;
+}
+
 
 async function loadUserStats(userId) {
     try {
