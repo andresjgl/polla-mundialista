@@ -184,23 +184,71 @@ router.get('/profile', authenticateToken, async (req, res) => {
     }
 });
 
-// POST /api/auth/activate/:userId - Activar usuario (solo admin)
+// POST /api/auth/activate/:userId - Activar usuario (VERSIÓN CORREGIDA)
 router.post('/activate/:userId', authenticateToken, requireAdmin, async (req, res) => {
     try {
         const { userId } = req.params;
         
-        const success = await userOperations.activateUser(userId);
-        if (!success) {
-            return res.status(404).json({ error: 'Usuario no encontrado' });
+        console.log(`🔓 Admin activando usuario ID: ${userId}`);
+        
+        if (!userId) {
+            return res.status(400).json({ error: 'ID de usuario requerido' });
         }
 
-        res.json({ message: 'Usuario activado exitosamente' });
+        const { db } = require('../database');
+
+        // Verificar que el usuario existe y obtener su información
+        db.get('SELECT id, name, email, is_active FROM users WHERE id = ?', [userId], (err, user) => {
+            if (err) {
+                console.error('❌ Error verificando usuario:', err);
+                return res.status(500).json({ error: 'Error interno del servidor' });
+            }
+
+            if (!user) {
+                console.log('⚠️ Usuario no encontrado:', userId);
+                return res.status(404).json({ error: 'Usuario no encontrado' });
+            }
+
+            if (user.is_active) {
+                console.log('⚠️ Usuario ya está activo:', user.name);
+                return res.status(400).json({ error: 'El usuario ya está activo' });
+            }
+
+            // Activar usuario
+            db.run(`
+                UPDATE users 
+                SET is_active = ?, updated_at = NOW()
+                WHERE id = ?
+            `, [true, userId], function(err) {
+                if (err) {
+                    console.error('❌ Error activando usuario:', err);
+                    return res.status(500).json({ error: 'Error activando usuario: ' + err.message });
+                }
+
+                if (this.changes === 0) {
+                    return res.status(404).json({ error: 'Usuario no encontrado' });
+                }
+
+                console.log(`✅ Usuario activado exitosamente: ${user.name} (${user.email})`);
+
+                res.json({
+                    message: 'Usuario activado exitosamente',
+                    user: {
+                        id: parseInt(userId),
+                        name: user.name,
+                        email: user.email,
+                        is_active: true
+                    }
+                });
+            });
+        });
 
     } catch (error) {
-        console.error('Error activando usuario:', error);
-        res.status(500).json({ error: 'Error interno del servidor' });
+        console.error('❌ Error en activación de usuario:', error);
+        res.status(500).json({ error: 'Error interno del servidor: ' + error.message });
     }
 });
+
 
 // GET /api/auth/stats - Estadísticas de usuarios
 // GET /api/auth/stats - Estadísticas del dashboard
