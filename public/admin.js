@@ -229,6 +229,12 @@ async function activateUser(userId) {
 
 async function loadTournaments() {
     try {
+        console.log('🏆 Cargando gestión de torneos...');
+        
+        // Primero cargar torneo activo con estadísticas
+        await loadActiveTournament();
+        
+        // Luego cargar la lista completa de torneos (para el futuro)
         const token = localStorage.getItem('token');
         const response = await fetch('/api/admin/tournaments', {
             headers: {
@@ -238,9 +244,12 @@ async function loadTournaments() {
 
         if (response.ok) {
             const tournaments = await response.json();
-            displayTournaments(tournaments);
-        } else {
-            document.getElementById('tournamentsList').innerHTML = '<p>Error cargando torneos</p>';
+            console.log('📋 Torneos adicionales:', tournaments.length);
+            
+            // Si hay más de un torneo, mostrar todos
+            if (tournaments.length > 1) {
+                displayAllTournaments(tournaments);
+            }
         }
     } catch (error) {
         console.error('Error cargando torneos:', error);
@@ -1965,4 +1974,77 @@ function viewMatchDetails(matchId) {
     // - Todas las predicciones del partido
     // - Estadísticas de aciertos
     // - Distribución de predicciones
+}
+
+// ============= GESTIÓN DE TORNEO ACTIVO CON ESTADÍSTICAS =============
+
+// Cargar torneo activo con estadísticas
+async function loadActiveTournament() {
+    try {
+        console.log('🏆 Cargando torneo activo con estadísticas...');
+        
+        const response = await fetchWithAuth('/api/admin/active-tournament');
+        if (!response || !response.ok) {
+            console.error('❌ Error obteniendo torneo activo:', response?.status);
+            return;
+        }
+        
+        const data = await response.json();
+        console.log('📊 Datos del torneo activo:', data);
+        
+        if (data.active_tournament) {
+            displayActiveTournament(data.active_tournament);
+        } else {
+            console.log('⚠️ No hay torneo activo');
+        }
+        
+    } catch (error) {
+        console.error('❌ Error cargando torneo activo:', error);
+    }
+}
+
+// Mostrar torneo activo con estadísticas
+function displayActiveTournament(tournament) {
+    console.log('🎯 Mostrando torneo activo:', tournament);
+    
+    // Buscar el contenedor donde se muestra el torneo activo
+    const container = document.getElementById('tournamentsList');
+    if (!container) {
+        console.warn('⚠️ Container tournamentsList no encontrado');
+        return;
+    }
+    
+    // Crear HTML del torneo activo con estadísticas correctas
+    const tournamentHTML = `
+        <div class="tournament-card">
+            <div class="tournament-header">
+                <div class="tournament-title">${tournament.name}</div>
+                <div class="tournament-status status-${tournament.status}">
+                    ${getStatusText(tournament.status)}
+                </div>
+            </div>
+            
+            <div class="tournament-info">
+                <div><strong>Inicio:</strong> ${formatDate(tournament.start_date)}</div>
+                <div><strong>Fin:</strong> ${formatDate(tournament.end_date)}</div>
+                <div><strong>Partidos:</strong> ${tournament.total_matches || 0}</div>
+                <div><strong>Predicciones:</strong> ${tournament.total_predictions || 0}</div>
+            </div>
+            
+            <div class="tournament-actions">
+                <button class="btn btn-secondary btn-small" onclick="setTournamentStatus(${tournament.id}, 'upcoming')">
+                    Desactivar
+                </button>
+                <button class="btn btn-secondary btn-small" onclick="manageTournamentPhases(${tournament.id}, '${tournament.name}')">
+                    Gestionar Fases
+                </button>
+                <button class="btn btn-secondary btn-small" onclick="viewTournamentDetails(${tournament.id})">
+                    Ver Detalles
+                </button>
+            </div>
+        </div>
+    `;
+    
+    container.innerHTML = tournamentHTML;
+    console.log('✅ Torneo activo mostrado con estadísticas correctas');
 }
