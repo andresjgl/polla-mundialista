@@ -270,61 +270,70 @@ async function loadUpcomingMatches() {
 async function displayUpcomingMatches(matches) {
     const container = document.getElementById('upcomingMatches');
     
-    if (matches.length === 0) {
+    if (!matches || matches.length === 0) {
         container.innerHTML = `
             <div class="no-matches">
                 <p>📅 No hay partidos próximos</p>
-                <small>Los próximos partidos aparecerán aquí</small>
+                <small>Los próximos partidos aparecerán aquí cuando los admins los publiquen</small>
             </div>
         `;
         return;
     }
 
-    // Obtener predicciones existentes del usuario
-    const token = localStorage.getItem('token');
-    const predictionsResponse = await fetch('/api/predictions/user', {
-        headers: { 'Authorization': `Bearer ${token}` }
-    });
-    
-    const userPredictions = predictionsResponse.ok ? await predictionsResponse.json() : [];
-    const predictionsMap = {};
-    userPredictions.forEach(p => {
-        predictionsMap[p.match_id] = p;
+    // Agrupar partidos por fase con validación
+    const matchesByPhase = {};
+    matches.forEach(match => {
+        const phaseName = match.phase_name || 'Sin fase';
+        if (!matchesByPhase[phaseName]) {
+            matchesByPhase[phaseName] = [];
+        }
+        matchesByPhase[phaseName].push(match);
     });
 
-    const matchesHTML = matches.map(match => {
-        const prediction = predictionsMap[match.id];
-        const hasPrediction = !!prediction;
+    const matchesHTML = Object.entries(matchesByPhase).map(([phaseName, phaseMatches]) => {
+        const firstMatch = phaseMatches[0];
+        const isEliminatory = firstMatch.is_eliminatory || false;
+        const multiplier = firstMatch.points_multiplier || 1;
         
         return `
-            <div class="match-card" data-match-id="${match.id}">
-                <div class="match-info">
-                    <div class="teams">
-                        <span class="team">${match.home_team}</span>
-                        <span class="vs">vs</span>
-                        <span class="team">${match.away_team}</span>
+            <div class="phase-section">
+                <div class="phase-header-user">
+                    <h4>${phaseName}</h4>
+                    <div class="phase-info-user">
+                        <span class="multiplier-badge">${multiplier}x puntos</span>
+                        ${isEliminatory ? '<span class="eliminatory-badge-user">ELIMINATORIA</span>' : ''}
                     </div>
-                    <div class="match-date">
-                        ${formatDate(match.match_date)}
-                    </div>
-                    <div class="match-status">
-                        ${getMatchStatusText(match.status)}
-                    </div>
-                    ${hasPrediction ? `
-                        <div class="existing-prediction">
-                            <small>Tu predicción: ${prediction.predicted_home_score}-${prediction.predicted_away_score} 
-                            (${getPredictionText(prediction.predicted_winner)})</small>
-                        </div>
-                    ` : ''}
                 </div>
-                <div class="match-actions">
-                    ${match.status === 'scheduled' ? 
-                        `<button class="btn ${hasPrediction ? 'btn-secondary' : 'btn-primary'} btn-small" 
-                                onclick="showPredictionForm('${match.id}', '${match.home_team}', '${match.away_team}')">
-                            ${hasPrediction ? 'Editar' : 'Predecir'}
-                        </button>` : 
-                        `<span class="match-closed">Cerrado</span>`
-                    }
+                <div class="phase-matches">
+                    ${phaseMatches.map(match => `
+                        <div class="match-card ${isEliminatory ? 'eliminatory-match' : ''}" data-match-id="${match.id}">
+                            <div class="match-info">
+                                <div class="teams">
+                                    <span class="team">${match.home_team || 'Equipo Local'}</span>
+                                    <span class="vs">vs</span>
+                                    <span class="team">${match.away_team || 'Equipo Visitante'}</span>
+                                </div>
+                                <div class="match-date">
+                                    ${formatDate(match.match_date)}
+                                </div>
+                                <div class="match-points-info">
+                                    <small>
+                                        Resultado: ${(firstMatch.result_points || 1) * multiplier} pts | 
+                                        Marcador: ${(firstMatch.exact_score_points || 3) * multiplier} pts
+                                    </small>
+                                </div>
+                            </div>
+                            <div class="match-actions">
+                                ${match.status === 'scheduled' ? 
+                                    `<button class="btn btn-primary btn-small" 
+                                            onclick="showPredictionForm('${match.id}', '${match.home_team}', '${match.away_team}', ${isEliminatory})">
+                                        Predecir
+                                    </button>` : 
+                                    `<span class="match-closed">Cerrado</span>`
+                                }
+                            </div>
+                        </div>
+                    `).join('')}
                 </div>
             </div>
         `;
@@ -332,6 +341,7 @@ async function displayUpcomingMatches(matches) {
 
     container.innerHTML = matchesHTML;
 }
+
 
 
 // Función para cargar predicciones del usuario
