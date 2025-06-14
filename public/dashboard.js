@@ -152,60 +152,113 @@ async function loadLeaderboard() {
 
 // --- ¡NUEVAS FUNCIONES! ---
 
-// En dashboard.js, reemplaza la función loadUpcomingMatches:
+// En dashboard.js, reemplaza loadUpcomingMatches:
 async function loadUpcomingMatches() {
     const container = document.getElementById('upcomingMatches');
+    container.innerHTML = `<p>Cargando partidos...</p>`;
     
     try {
         console.log('🔍 Solicitando partidos próximos...');
         
         const response = await fetchWithAuth('/api/matches/upcoming');
-        if (!response || !response.ok) {
-            console.error('❌ Error en respuesta:', response?.status);
-            throw new Error('Error fetching matches');
+        if (!response) {
+            console.log('⚠️ No hay respuesta (probablemente token expirado)');
+            return;
+        }
+        
+        if (!response.ok) {
+            console.error('❌ Error en respuesta:', response.status);
+            throw new Error(`HTTP ${response.status}`);
         }
         
         const matches = await response.json();
-        console.log('📊 Partidos recibidos:', matches);
-        console.log('📊 Cantidad de partidos:', matches?.length);
+        console.log('📊 Respuesta recibida:', matches);
+        console.log('📊 Tipo de respuesta:', typeof matches);
+        console.log('📊 Es array?', Array.isArray(matches));
         
-        displayUpcomingMatches(matches);
+        await displayUpcomingMatches(matches);
+        
     } catch (error) {
         console.error('❌ Error cargando próximos partidos:', error);
-        container.innerHTML = `<div class="no-data"><p>No se pudieron cargar los partidos.</p></div>`;
+        container.innerHTML = `
+            <div class="no-data">
+                <p>No se pudieron cargar los partidos.</p>
+                <button class="btn btn-secondary btn-small" onclick="loadUpcomingMatches()">
+                    Reintentar
+                </button>
+            </div>
+        `;
     }
 }
 
 
+
+// En dashboard.js, reemplaza displayUpcomingMatches:
 async function displayUpcomingMatches(matches) {
     const container = document.getElementById('upcomingMatches');
-    if (!matches || matches.length === 0) {
+    
+    console.log('🎯 displayUpcomingMatches llamada con:', matches);
+    console.log('🎯 Es array?', Array.isArray(matches));
+    console.log('🎯 Longitud:', matches?.length);
+    
+    // VALIDACIÓN ROBUSTA
+    if (!matches || !Array.isArray(matches) || matches.length === 0) {
         container.innerHTML = `<div class="no-data"><p>📅 No hay partidos programados por el momento.</p></div>`;
         return;
     }
 
-    const predictionsResponse = await fetchWithAuth('/api/predictions/user');
-    const userPredictions = predictionsResponse.ok ? await predictionsResponse.json() : [];
-    const predictionsMap = new Map(userPredictions.map(p => [p.match_id, p]));
+    try {
+        // Cargar predicciones del usuario
+        const predictionsResponse = await fetchWithAuth('/api/predictions/user');
+        const userPredictions = predictionsResponse && predictionsResponse.ok ? 
+            await predictionsResponse.json() : [];
+        
+        const predictionsMap = new Map();
+        if (Array.isArray(userPredictions)) {
+            userPredictions.forEach(p => predictionsMap.set(p.match_id, p));
+        }
 
-    container.innerHTML = matches.map(match => {
-        const prediction = predictionsMap.get(match.id);
-        const hasPrediction = !!prediction;
-        return `
-            <div class="match-card" data-match-id="${match.id}">
-                <div class="match-info">
-                    <div class="teams"><span class="team">${match.home_team}</span> <span class="vs">vs</span> <span class="team">${match.away_team}</span></div>
-                    <div class="match-date">${formatFullDate(match.match_date)}</div>
-                    ${hasPrediction ? `<div class="existing-prediction"><small>Tu predicción: ${prediction.predicted_home_score} - ${prediction.predicted_away_score}</small></div>` : ''}
+        const matchesHTML = matches.map(match => {
+            const prediction = predictionsMap.get(match.id);
+            const hasPrediction = !!prediction;
+            
+            return `
+                <div class="match-card" data-match-id="${match.id}">
+                    <div class="match-info">
+                        <div class="teams">
+                            <span class="team">${match.home_team}</span> 
+                            <span class="vs">vs</span> 
+                            <span class="team">${match.away_team}</span>
+                        </div>
+                        <div class="match-date">${formatFullDate(match.match_date)}</div>
+                        <div class="phase-info">
+                            <small>📋 ${match.phase_name} - ${match.tournament_name}</small>
+                        </div>
+                        ${hasPrediction ? `
+                            <div class="existing-prediction">
+                                <small>Tu predicción: ${prediction.predicted_home_score} - ${prediction.predicted_away_score}</small>
+                            </div>
+                        ` : ''}
+                    </div>
+                    <div class="match-actions">
+                        <button class="btn ${hasPrediction ? 'btn-secondary' : 'btn-primary'} btn-small" 
+                                onclick="showPredictionForm('${match.id}', '${match.home_team}', '${match.away_team}', ${hasPrediction ? `'${prediction.predicted_home_score}', '${prediction.predicted_away_score}'` : 'null, null'})">
+                            ${hasPrediction ? 'Editar' : 'Predecir'}
+                        </button>
+                    </div>
                 </div>
-                <div class="match-actions">
-                    <button class="btn ${hasPrediction ? 'btn-secondary' : 'btn-primary'} btn-small" onclick="showPredictionForm('${match.id}', '${match.home_team}', '${match.away_team}', ${hasPrediction ? `'${prediction.predicted_home_score}', '${prediction.predicted_away_score}'` : 'null, null'})">
-                        ${hasPrediction ? 'Editar' : 'Predecir'}
-                    </button>
-                </div>
-            </div>`;
-    }).join('');
+            `;
+        }).join('');
+
+        container.innerHTML = matchesHTML;
+        console.log('✅ Partidos renderizados exitosamente');
+        
+    } catch (error) {
+        console.error('❌ Error renderizando partidos:', error);
+        container.innerHTML = `<div class="no-data"><p>Error mostrando partidos</p></div>`;
+    }
 }
+
 
 // Reemplaza la función existente en public/dashboard.js
 async function loadUserPredictions() {

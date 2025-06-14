@@ -4,15 +4,14 @@ const { authenticateToken } = require('./auth');
 
 const router = express.Router();
 
-// GET /api/matches/upcoming - Partidos próximos para usuarios
-// GET /api/matches/upcoming - Partidos próximos para usuarios (MEJORADA)
+// GET /api/matches/upcoming - CORREGIDA para PostgreSQL
 router.get('/upcoming', authenticateToken, async (req, res) => {
     console.log('🔍 GET /matches/upcoming solicitado');
     
     try {
         const { db } = require('../database');
         
-        // NUEVA CONSULTA: Incluye verificación de torneo activo
+        // CONSULTA CORREGIDA - Compatible con PostgreSQL
         const query = `
             SELECT 
                 m.id,
@@ -26,7 +25,7 @@ router.get('/upcoming', authenticateToken, async (req, res) => {
                 m.phase_id,
                 COALESCE(tp.name, 'Sin fase') as phase_name,
                 COALESCE(tp.points_multiplier, 1) as points_multiplier,
-                COALESCE(tp.is_eliminatory, 0) as is_eliminatory,
+                COALESCE(tp.is_eliminatory, false) as is_eliminatory,
                 COALESCE(tp.result_points, 1) as result_points,
                 COALESCE(tp.exact_score_points, 3) as exact_score_points,
                 t.name as tournament_name,
@@ -35,31 +34,33 @@ router.get('/upcoming', authenticateToken, async (req, res) => {
             LEFT JOIN tournament_phases tp ON m.phase_id = tp.id
             LEFT JOIN tournaments t ON m.tournament_id = t.id
             WHERE t.status = 'active' 
-            AND m.status IN ('scheduled', 'upcoming')
-            AND m.match_date > NOW()
+            AND m.status = 'scheduled'
             ORDER BY m.match_date ASC
             LIMIT 20
         `;
         
-        console.log('🔧 Ejecutando query para partidos próximos...');
+        console.log('🔧 Ejecutando query corregida...');
         
         db.all(query, [], (err, matches) => {
             if (err) {
                 console.error('❌ Error obteniendo partidos próximos:', err);
-                return res.json({ matches: [], error: err.message });
+                return res.json([]); // Siempre devolver array vacío, no error
             }
             
             console.log(`✅ Partidos próximos encontrados: ${matches ? matches.length : 0}`);
-            console.log('📊 Primeros partidos:', matches?.slice(0, 3));
+            if (matches && matches.length > 0) {
+                console.log('📊 Primer partido:', matches[0]);
+            }
             
-            res.json(matches || []);
+            res.json(matches || []); // Siempre array, nunca null
         });
         
     } catch (error) {
         console.error('❌ Error en route matches/upcoming:', error);
-        res.json({ matches: [], error: error.message });
+        res.json([]); // Siempre devolver array vacío
     }
 });
+
 
 
 
