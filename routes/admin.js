@@ -8,33 +8,83 @@ const router = express.Router();
 
 // ============= GESTIÓN DE TORNEOS =============
 
-// GET /api/admin/active-tournament - Obtener torneo activo (VERSIÓN FINAL Y FUNCIONAL)
+// GET /api/admin/active-tournament - VERSIÓN CORREGIDA CON LOGS
 router.get('/active-tournament', (req, res) => {
-    const query = `
-        SELECT
-            t.id,
-            t.name,
-            t.start_date,
-            t.end_date,
-            t.status,
-            COALESCE(COUNT(m.id), 0) as total_matches,
-            COALESCE(SUM(CASE WHEN m.status = 'finished' THEN 1 ELSE 0 END), 0) as finished_matches,
-            (SELECT COUNT(*) FROM predictions_new p JOIN matches_new m2 ON p.match_id = m2.id WHERE m2.tournament_id = t.id) as total_predictions
-        FROM tournaments t
-        LEFT JOIN matches_new m ON t.id = m.tournament_id
-        WHERE t.status = 'active'
-        GROUP BY t.id
-        LIMIT 1;
-    `;
+    console.log('🔍 GET /active-tournament solicitado');
     
-    db.get(query, [], (err, tournament) => {
-        if (err) {
-            console.error('❌ Error obteniendo torneo activo:', err);
-            return res.status(500).json({ error: 'Error interno del servidor.' });
-        }
-        res.json({ active_tournament: tournament || null });
-    });
+    try {
+        // Paso 1: Obtener torneo activo
+        db.get('SELECT * FROM tournaments WHERE status = ?', ['active'], (err, tournament) => {
+            if (err) {
+                console.error('❌ Error obteniendo torneo activo:', err);
+                return res.status(500).json({ error: 'Error interno del servidor.' });
+            }
+            
+            if (!tournament) {
+                console.log('⚠️ No hay torneo activo');
+                return res.json({ active_tournament: null });
+            }
+            
+            console.log('🏆 Torneo activo encontrado:', tournament.name, 'ID:', tournament.id);
+            
+            // Paso 2: Contar partidos del torneo
+            db.get('SELECT COUNT(*) as total FROM matches_new WHERE tournament_id = ?', [tournament.id], (err2, matchesResult) => {
+                if (err2) {
+                    console.error('❌ Error contando partidos:', err2);
+                    matchesResult = { total: 0 };
+                }
+                
+                console.log('⚽ Partidos encontrados:', matchesResult.total);
+                
+                // Paso 3: Contar partidos finalizados
+                db.get('SELECT COUNT(*) as finished FROM matches_new WHERE tournament_id = ? AND status = ?', [tournament.id, 'finished'], (err3, finishedResult) => {
+                    if (err3) {
+                        console.error('❌ Error contando partidos finalizados:', err3);
+                        finishedResult = { finished: 0 };
+                    }
+                    
+                    console.log('✅ Partidos finalizados:', finishedResult.finished);
+                    
+                    // Paso 4: Contar predicciones
+                    db.get(`
+                        SELECT COUNT(DISTINCT p.id) as total 
+                        FROM predictions_new p 
+                        JOIN matches_new m ON p.match_id = m.id 
+                        WHERE m.tournament_id = ?
+                    `, [tournament.id], (err4, predictionsResult) => {
+                        if (err4) {
+                            console.error('❌ Error contando predicciones:', err4);
+                            predictionsResult = { total: 0 };
+                        }
+                        
+                        console.log('🎯 Predicciones encontradas:', predictionsResult.total);
+                        
+                        // Resultado final
+                        const result = {
+                            id: tournament.id,
+                            name: tournament.name,
+                            start_date: tournament.start_date,
+                            end_date: tournament.end_date,
+                            status: tournament.status,
+                            total_matches: matchesResult.total || 0,
+                            finished_matches: finishedResult.finished || 0,
+                            total_predictions: predictionsResult.total || 0
+                        };
+                        
+                        console.log('📊 Estadísticas finales del torneo:', result);
+                        
+                        res.json({ active_tournament: result });
+                    });
+                });
+            });
+        });
+        
+    } catch (error) {
+        console.error('❌ Error general:', error);
+        res.status(500).json({ error: 'Error interno del servidor.' });
+    }
 });
+
 
 // GET /api/admin/tournaments - Listar todos los torneos
 router.get('/tournaments', authenticateToken, requireAdmin, (req, res) => {
@@ -1382,39 +1432,6 @@ router.post('/matches', authenticateToken, requireAdmin, async (req, res) => {
         console.error('❌ Error creando partido:', error);
         res.status(500).json({ error: 'Error interno del servidor: ' + error.message });
     }
-});
-
-
-// GET /api/admin/active-tournament - Obtener torneo activo (VERSIÓN CORREGIDA Y ROBUSTA)
-router.get('/active-tournament', (req, res) => {
-    // Esta consulta usa LEFT JOIN y COALESCE para manejar correctamente los torneos sin partidos.
-    const query = `
-        SELECT 
-            t.id,
-            t.name,
-            t.start_date,
-            t.end_date,
-            t.status,
-            COALESCE(COUNT(m.id), 0) as total_matches,
-            COALESCE(SUM(CASE WHEN m.status = 'finished' THEN 1 ELSE 0 END), 0) as finished_matches,
-            (SELECT COUNT(*) FROM predictions_new p JOIN matches_new m2 ON p.match_id = m2.id WHERE m2.tournament_id = t.id) as total_predictions
-        FROM tournaments t
-        LEFT JOIN matches_new m ON t.id = m.tournament_id
-        WHERE t.status = 'active'
-        GROUP BY t.id
-        LIMIT 1;
-    `;
-    
-    db.get(query, [], (err, tournament) => {
-        if (err) {
-            console.error('❌ Error obteniendo torneo activo:', err);
-            return res.status(500).json({ error: 'Error interno del servidor al buscar torneo' });
-        }
-        
-        res.json({ 
-            active_tournament: tournament || null
-        });
-    });
 });
 
 

@@ -213,7 +213,6 @@ async function displayUpcomingMatchesWithPagination(data) {
     if (!matches || matches.length === 0) {
         container.innerHTML = `
             <div class="matches-header">
-                <h3>⚽ Próximos Partidos</h3>
                 ${createFilterControls(pagination.total, filter)}
             </div>
             <div class="no-data">
