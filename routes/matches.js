@@ -229,7 +229,7 @@ router.post('/:matchId/result', authenticateToken, requireAdmin, async (req, res
                     away_score = ?, 
                     status = 'finished',
                     penalty_winner = ?,
-                    updated_at = ${getCurrentTimestamp()}
+                    updated_at = NOW()
                 WHERE id = ?
             `, [home_score, away_score, penalty_winner || null, matchId], async function(err) {
                 if (err) {
