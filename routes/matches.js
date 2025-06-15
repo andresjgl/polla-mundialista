@@ -152,8 +152,7 @@ router.get('/', authenticateToken, async (req, res) => {
     }
 });
 
-
-// POST /api/matches/:matchId/result - Actualizar resultado (VERSIÓN SIMPLIFICADA)
+// POST /api/matches/:matchId/result - Actualizar resultado (VERSIÓN CORREGIDA)
 router.post('/:matchId/result', authenticateToken, requireAdmin, async (req, res) => {
     try {
         const { matchId } = req.params;
@@ -186,7 +185,7 @@ router.post('/:matchId/result', authenticateToken, requireAdmin, async (req, res
             LEFT JOIN tournament_phases tp ON m.phase_id = tp.id
             LEFT JOIN tournaments t ON m.tournament_id = t.id
             WHERE m.id = ?
-        `, [matchId], (err, match) => {
+        `, [matchId], async (err, match) => {
             if (err) {
                 console.error('❌ Error verificando partido:', err);
                 return res.status(500).json({ error: 'Error verificando partido' });
@@ -232,7 +231,7 @@ router.post('/:matchId/result', authenticateToken, requireAdmin, async (req, res
                     penalty_winner = ?,
                     updated_at = NOW()
                 WHERE id = ?
-            `, [home_score, away_score, penalty_winner || null, matchId], function(err) {
+            `, [home_score, away_score, penalty_winner || null, matchId], async function(err) {
                 if (err) {
                     console.error('❌ Error actualizando partido:', err);
                     return res.status(500).json({ error: 'Error actualizando resultado: ' + err.message });
@@ -244,20 +243,46 @@ router.post('/:matchId/result', authenticateToken, requireAdmin, async (req, res
 
                 console.log(`✅ Resultado actualizado: ${match.home_team} ${home_score}-${away_score} ${match.away_team}`);
 
-                // Calcular puntos básico (placeholder)
-                calculateBasicPredictionPoints(matchId, home_score, away_score, winner);
-
-                res.json({
-                    message: 'Resultado actualizado exitosamente',
-                    match_id: matchId,
-                    score: `${match.home_team} ${home_score}-${away_score} ${match.away_team}`,
-                    penalty_winner: penalty_winner || null,
-                    predictions_updated: 0, // Placeholder
-                    phase_info: {
-                        name: match.phase_name,
-                        is_eliminatory: match.is_eliminatory
-                    }
-                });
+                // ✅ USAR EL SISTEMA DE PUNTOS EXISTENTE
+                try {
+                    const { pointsCalculator } = require('../database');
+                    const pointsResult = await pointsCalculator.updateMatchPredictions(
+                        matchId, 
+                        home_score, 
+                        away_score
+                    );
+                    
+                    console.log(`🎯 Puntos calculados: ${pointsResult.updated} predicciones actualizadas`);
+                    
+                    res.json({
+                        message: 'Resultado actualizado exitosamente',
+                        match_id: matchId,
+                        score: `${match.home_team} ${home_score}-${away_score} ${match.away_team}`,
+                        penalty_winner: penalty_winner || null,
+                        predictions_updated: pointsResult.updated || 0,
+                        phase_info: {
+                            name: match.phase_name,
+                            is_eliminatory: match.is_eliminatory
+                        }
+                    });
+                    
+                } catch (pointsError) {
+                    console.error('❌ Error calculando puntos:', pointsError);
+                    
+                    // Aunque falle el cálculo de puntos, el resultado se guardó correctamente
+                    res.json({
+                        message: 'Resultado actualizado exitosamente (sin calcular puntos)',
+                        match_id: matchId,
+                        score: `${match.home_team} ${home_score}-${away_score} ${match.away_team}`,
+                        penalty_winner: penalty_winner || null,
+                        predictions_updated: 0,
+                        warning: 'Los puntos se calcularán manualmente',
+                        phase_info: {
+                            name: match.phase_name,
+                            is_eliminatory: match.is_eliminatory
+                        }
+                    });
+                }
             });
         });
 

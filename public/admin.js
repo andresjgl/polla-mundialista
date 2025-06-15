@@ -1076,43 +1076,6 @@ async function submitMatchResult(event, matchId, isEliminatory = false) {
 }
 
 
-async function submitMatchResult(event, matchId) {
-    event.preventDefault();
-
-    const form = event.target;
-    const formData = new FormData(form);
-
-    const result = {
-        home_score: parseInt(formData.get('homeScore')),
-        away_score: parseInt(formData.get('awayScore'))
-    };
-
-    try {
-        const token = localStorage.getItem('token');
-        const response = await fetch(`/api/matches/${matchId}/result`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify(result)
-        });
-
-        const responseData = await response.json();
-
-        if (response.ok) {
-            alert(`¡Resultado actualizado! ${responseData.predictions_updated} predicciones procesadas.`);
-            closeModal();
-            await loadMatches();
-        } else {
-            alert('Error: ' + responseData.error);
-        }
-    } catch (error) {
-        console.error('Error actualizando resultado:', error);
-        alert('Error de conexión');
-    }
-}
-
 // ============= FUNCIONES AUXILIARES =============
 
 // Función mejorada para cerrar modales específicos
