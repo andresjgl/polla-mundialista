@@ -19,6 +19,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadTournaments();
 });
 
+// ============= VARIABLES GLOBALES PARA PAGINACIÓN =============
+
+let currentPage = 1;
+let totalPages = 1;
+let currentFilters = { tournament_id: '', status: 'all' };
+
 // ============= GESTIÓN DE TABS =============
 
 function showTab(tabName) {
@@ -719,45 +725,110 @@ async function deleteTeam(teamId, teamName) {
 
 // ============= GESTIÓN DE PARTIDOS =============
 
-async function loadMatches() {
-    try {
-        const token = localStorage.getItem('token');
-        const response = await fetch('/api/matches/with-predictions', {
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
-        });
+// ============= GESTIÓN DE PARTIDOS CON PAGINACIÓN =============
 
-        if (response.ok) {
-            const matches = await response.json();
-            displayMatches(matches);
-        } else {
-            document.getElementById('matchesList').innerHTML = '<p>Error cargando partidos</p>';
+async function loadMatches(page = 1) {
+    try {
+        console.log(`📊 Cargando partidos - Página: ${page}`);
+        
+        // Mostrar loading
+        const container = document.getElementById('matchesList');
+        if (container) {
+            container.innerHTML = `
+                <div class="loading-state">
+                    <div class="loading-spinner"></div>
+                    <p>Cargando partidos...</p>
+                </div>
+            `;
         }
+        
+        const token = localStorage.getItem('token');
+        const limit = 10; // Partidos por página
+        
+        // Construir URL con parámetros
+        const params = new URLSearchParams({
+            page: page,
+            limit: limit,
+            ...currentFilters
+        });
+        
+        const response = await fetch(`/api/matches/with-predictions?${params}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            currentPage = data.pagination.currentPage;
+            totalPages = data.pagination.totalPages;
+            
+            displayMatches(data.matches, data.pagination);
+            updatePaginationControls(data.pagination);
+            
+            console.log(`✅ ${data.matches.length} partidos cargados`);
+        } else {
+            throw new Error('Error cargando partidos');
+        }
+        
     } catch (error) {
-        console.error('Error cargando partidos:', error);
-        document.getElementById('matchesList').innerHTML = '<p>Error de conexión</p>';
+        console.error('❌ Error cargando partidos:', error);
+        const container = document.getElementById('matchesList');
+        if (container) {
+            container.innerHTML = `
+                <div class="error-state">
+                    <div class="error-icon">⚠️</div>
+                    <p>Error cargando partidos</p>
+                    <button class="btn btn-secondary btn-small" onclick="loadMatches()">
+                        🔄 Reintentar
+                    </button>
+                </div>
+            `;
+        }
     }
 }
 
-// Función displayMatches mejorada en admin.js
-function displayMatches(matches) {
+
+// Función displayMatches mejorada con paginación
+function displayMatches(matches, pagination) {
     const container = document.getElementById('matchesList');
+
+    if (!container) {
+        console.warn('⚠️ Container matchesList no encontrado');
+        return;
+    }
 
     if (!matches || matches.length === 0) {
         container.innerHTML = `
             <div class="no-data">
-                <p>⚽ No hay partidos creados</p>
-                <small>Crea partidos para que los usuarios puedan hacer predicciones</small>
+                <p>⚽ No hay partidos</p>
+                <small>No se encontraron partidos con los filtros aplicados.</small>
             </div>
         `;
         return;
     }
 
-    console.log('🎯 Renderizando partidos:', matches.length);
-    console.log('🎯 Primer partido:', matches[0]);
-
-    const matchesHTML = matches.map(match => {
+    let html = `
+        <!-- Info de paginación -->
+        <div class="pagination-info">
+            <span class="matches-count">
+                📊 Mostrando ${pagination.startIndex}-${pagination.endIndex} de ${pagination.totalMatches} partidos
+            </span>
+            <div class="view-options">
+                <select id="statusFilter" onchange="applyFilters()" class="filter-select">
+                    <option value="all" ${currentFilters.status === 'all' ? 'selected' : ''}>Todos los estados</option>
+                    <option value="scheduled" ${currentFilters.status === 'scheduled' ? 'selected' : ''}>Programados</option>
+                    <option value="finished" ${currentFilters.status === 'finished' ? 'selected' : ''}>Finalizados</option>
+                </select>
+                <select id="tournamentFilter" onchange="applyFilters()" class="filter-select">
+                    <option value="">Todos los torneos</option>
+                </select>
+            </div>
+        </div>
+        
+        <!-- Lista de partidos -->
+        <div class="matches-grid">
+    `;
+    
+    matches.forEach(match => {
         // MANEJO DEFENSIVO DE VALORES UNDEFINED/NULL
         const phaseName = match.phase_name || 'Sin fase';
         const pointsMultiplier = match.points_multiplier || 1;
@@ -784,7 +855,7 @@ function displayMatches(matches) {
             scoreDisplay = statusText;
         }
 
-        return `
+        html += `
             <div class="match-card-admin" data-match-id="${match.id}">
                 <div class="match-grid">
                     <div class="match-teams">
@@ -812,12 +883,16 @@ function displayMatches(matches) {
                             ${status === 'scheduled' ? `
                                 <button class="btn btn-primary btn-small" 
                                         onclick="updateMatchResult('${match.id}', '${match.home_team}', '${match.away_team}')">
-                                    Actualizar Resultado
+                                    ⚽ Actualizar Resultado
                                 </button>
                             ` : `
                                 <button class="btn btn-secondary btn-small" 
                                         onclick="viewMatchDetails('${match.id}')">
-                                    Ver Detalles
+                                    👁️ Ver Detalles
+                                </button>
+                                <button class="btn btn-outline btn-small" 
+                                        onclick="resetMatch('${match.id}')">
+                                    🔄 Resetear
                                 </button>
                             `}
                         </div>
@@ -825,11 +900,167 @@ function displayMatches(matches) {
                 </div>
             </div>
         `;
-    }).join('');
-
-    container.innerHTML = matchesHTML;
-    console.log('✅ Partidos renderizados correctamente');
+    });
+    
+    html += '</div>';
+    container.innerHTML = html;
+    
+    // Cargar filtro de torneos si no está cargado
+    loadTournamentFilterOptions();
+    
+    console.log('✅ Partidos renderizados correctamente con paginación');
 }
+
+// ============= FUNCIONES DE PAGINACIÓN =============
+
+function updatePaginationControls(pagination) {
+    // Buscar o crear contenedor de paginación
+    let paginationContainer = document.getElementById('matchesPagination');
+    if (!paginationContainer) {
+        paginationContainer = document.createElement('div');
+        paginationContainer.id = 'matchesPagination';
+        paginationContainer.className = 'pagination-container';
+        
+        const matchesContainer = document.getElementById('matchesList');
+        if (matchesContainer && matchesContainer.parentNode) {
+            matchesContainer.parentNode.insertBefore(paginationContainer, matchesContainer.nextSibling);
+        }
+    }
+    
+    if (pagination.totalPages <= 1) {
+        paginationContainer.innerHTML = '';
+        return;
+    }
+    
+    let html = '<div class="pagination-controls">';
+    
+    // Botón anterior
+    if (pagination.hasPrevPage) {
+        html += `
+            <button class="btn btn-secondary btn-small" onclick="loadMatches(${pagination.currentPage - 1})">
+                ◀️ Anterior
+            </button>
+        `;
+    }
+    
+    // Números de página
+    html += '<div class="page-numbers">';
+    
+    const startPage = Math.max(1, pagination.currentPage - 2);
+    const endPage = Math.min(pagination.totalPages, pagination.currentPage + 2);
+    
+    if (startPage > 1) {
+        html += `<button class="btn btn-outline btn-small" onclick="loadMatches(1)">1</button>`;
+        if (startPage > 2) {
+            html += '<span class="page-dots">...</span>';
+        }
+    }
+    
+    for (let i = startPage; i <= endPage; i++) {
+        const isActive = i === pagination.currentPage;
+        html += `
+            <button class="btn ${isActive ? 'btn-primary' : 'btn-outline'} btn-small" 
+                    onclick="loadMatches(${i})" 
+                    ${isActive ? 'disabled' : ''}>
+                ${i}
+            </button>
+        `;
+    }
+    
+    if (endPage < pagination.totalPages) {
+        if (endPage < pagination.totalPages - 1) {
+            html += '<span class="page-dots">...</span>';
+        }
+        html += `<button class="btn btn-outline btn-small" onclick="loadMatches(${pagination.totalPages})">${pagination.totalPages}</button>`;
+    }
+    
+    html += '</div>';
+    
+    // Botón siguiente
+    if (pagination.hasNextPage) {
+        html += `
+            <button class="btn btn-secondary btn-small" onclick="loadMatches(${pagination.currentPage + 1})">
+                Siguiente ▶️
+            </button>
+        `;
+    }
+    
+    html += '</div>';
+    paginationContainer.innerHTML = html;
+}
+
+// Función para aplicar filtros
+async function applyFilters() {
+    const statusFilter = document.getElementById('statusFilter')?.value || 'all';
+    const tournamentFilter = document.getElementById('tournamentFilter')?.value || '';
+    
+    currentFilters = {
+        status: statusFilter,
+        tournament_id: tournamentFilter
+    };
+    
+    // Resetear a página 1 cuando se aplican filtros
+    await loadMatches(1);
+}
+
+// Función para cargar opciones del filtro de torneos
+async function loadTournamentFilterOptions() {
+    const tournamentFilter = document.getElementById('tournamentFilter');
+    if (!tournamentFilter || tournamentFilter.children.length > 1) return; // Ya está cargado
+    
+    try {
+        const token = localStorage.getItem('token');
+        const response = await fetch('/api/admin/tournaments', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (response.ok) {
+            const tournaments = await response.json();
+            tournaments.forEach(tournament => {
+                const option = document.createElement('option');
+                option.value = tournament.id;
+                option.textContent = `${tournament.name} (${tournament.status})`;
+                if (currentFilters.tournament_id == tournament.id) {
+                    option.selected = true;
+                }
+                tournamentFilter.appendChild(option);
+            });
+        }
+    } catch (error) {
+        console.error('Error cargando filtro de torneos:', error);
+    }
+}
+
+// Función para resetear partido (nueva)
+async function resetMatch(matchId) {
+    if (!confirm('¿Estás seguro de que quieres resetear este partido?\\n\\nEsto eliminará el resultado y pondrá las predicciones en 0 puntos.')) {
+        return;
+    }
+    
+    try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`/api/admin/reset-match/${matchId}`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            alert('✅ ' + result.message);
+            await loadMatches(currentPage); // Recargar página actual
+        } else {
+            const error = await response.json();
+            alert('❌ Error: ' + error.error);
+        }
+    } catch (error) {
+        console.error('Error reseteando partido:', error);
+        alert('❌ Error de conexión');
+    }
+}
+
 
 
 // Reemplaza formatDateTime en admin.js:
@@ -1893,16 +2124,16 @@ async function loadTournamentFilter() {
     }
 }
 
-// Función para filtrar partidos por torneo (NUEVA)
-function filterMatchesByTournament() {
-    // Para implementar filtrado en tiempo real
-    loadMatches();
+// ✅ REEMPLAZAR CON ESTAS FUNCIONES REALES:
+
+async function loadTournamentFilter() {
+    await loadTournamentFilterOptions();
 }
 
-
-function loadTournamentFilter() {
-    // Placeholder
+async function filterMatchesByTournament() {
+    await applyFilters();
 }
+
 
 function filterMatchesByTournament() {
     // Placeholder
