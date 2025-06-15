@@ -17,6 +17,11 @@ console.log('   DATABASE_URL presente:', !!databaseUrl);
 
 let db;
 
+function getCurrentTimestamp() {
+    // En producción (PostgreSQL) usar NOW(), en desarrollo (SQLite) usar datetime('now')
+    return isProduction ? 'NOW()' : "datetime('now')";
+}
+
 if (isProduction && databaseUrl) {
     console.log('🌍 Configurando PostgreSQL para producción...');
     
@@ -1013,7 +1018,7 @@ const pointsCalculator = {
                         await new Promise((resolveUpdate, rejectUpdate) => {
                             db.run(`
                                 UPDATE predictions_new 
-                                SET result_points = ?, score_points = ?, points_earned = ?, updated_at = datetime('now')
+                                SET result_points = ?, score_points = ?, points_earned = ?, updated_at = ${getCurrentTimestamp()}
                                 WHERE id = ?
                             `, [points.resultPoints, points.scorePoints, points.totalPoints, prediction.id], 
                             function(updateErr) {
@@ -1043,6 +1048,7 @@ const pointsCalculator = {
         });
     });
 }
+
 
 };
 

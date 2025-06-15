@@ -1442,6 +1442,9 @@ router.post('/reset-match/:matchId', authenticateToken, requireAdmin, async (req
         
         const { db } = require('../database');
         
+        // Determinar sintaxis de fecha según entorno
+        const timestampFunc = process.env.NODE_ENV === 'production' || process.env.VERCEL ? 'NOW()' : "datetime('now')";
+        
         // Resetear el partido a estado original
         db.run(`
             UPDATE matches_new 
@@ -1449,7 +1452,7 @@ router.post('/reset-match/:matchId', authenticateToken, requireAdmin, async (req
                 away_score = NULL, 
                 status = 'scheduled',
                 penalty_winner = NULL,
-                updated_at = NOW()
+                updated_at = ${timestampFunc}
             WHERE id = ?
         `, [matchId], function(err) {
             if (err) {
@@ -1462,7 +1465,7 @@ router.post('/reset-match/:matchId', authenticateToken, requireAdmin, async (req
             // También resetear las predicciones
             db.run(`
                 UPDATE predictions_new 
-                SET points_earned = 0, result_points = 0, score_points = 0, updated_at = NOW()
+                SET points_earned = 0, result_points = 0, score_points = 0, updated_at = ${timestampFunc}
                 WHERE match_id = ?
             `, [matchId], function(err2) {
                 if (err2) {
@@ -1483,6 +1486,7 @@ router.post('/reset-match/:matchId', authenticateToken, requireAdmin, async (req
         res.status(500).json({ error: 'Error interno del servidor' });
     }
 });
+
 
 
 module.exports = router;
