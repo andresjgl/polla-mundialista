@@ -1107,8 +1107,22 @@ async function updateMatchResult(matchId, homeTeam, awayTeam) {
             headers: { 'Authorization': `Bearer ${token}` }
         });
 
-        const matches = await matchResponse.json();
+        const data = await matchResponse.json();
+        
+        // ✅ CORRECCIÓN: Manejo correcto de la respuesta paginada
+        const matches = data.matches || data || [];
+        
+        if (!Array.isArray(matches)) {
+            console.error('❌ Error: La respuesta no contiene un array de partidos válido');
+            throw new Error('Formato de respuesta inválido');
+        }
+        
         const match = matches.find(m => m.id === matchId);
+        
+        if (!match) {
+            console.warn('⚠️ Partido no encontrado en la respuesta, continuando sin información de fase');
+        }
+        
         const isEliminatory = match && match.phase_name &&
             (match.phase_name.toLowerCase().includes('final') ||
                 match.phase_name.toLowerCase().includes('octavo') ||
@@ -1221,9 +1235,10 @@ async function updateMatchResult(matchId, homeTeam, awayTeam) {
 
     } catch (error) {
         console.error('Error preparando formulario de resultado:', error);
-        alert('Error cargando información del partido');
+        alert('Error cargando información del partido: ' + error.message);
     }
 }
+
 
 // Función mejorada para enviar resultado
 async function submitMatchResult(event, matchId, isEliminatory = false) {
