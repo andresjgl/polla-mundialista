@@ -822,6 +822,7 @@ const userOperations = {
 };
 
 // ============= CALCULADORA DE PUNTOS =============
+// ============= CALCULADORA DE PUNTOS CON DEBUGGING =============
 const pointsCalculator = {
     calculatePredictionPoints: async (prediction, actualResult, phaseId) => {
         return new Promise((resolve, reject) => {
@@ -829,10 +830,12 @@ const pointsCalculator = {
                 SELECT * FROM tournament_phases WHERE id = ?
             `, [phaseId], (err, phase) => {
                 if (err) {
+                    console.error('❌ Error obteniendo fase:', err);
                     return reject(err);
                 }
 
                 if (!phase) {
+                    console.log('⚠️ FASE NO ENCONTRADA, usando valores por defecto para phaseId:', phaseId);
                     return resolve(pointsCalculator.calculateDefaultPoints(prediction, actualResult));
                 }
 
@@ -840,31 +843,80 @@ const pointsCalculator = {
                 let scorePoints = 0;
                 let bonusPoints = 0;
 
+                // 🔍 DEBUGGING: Ver qué valores estamos comparando
                 const actualWinner = pointsCalculator.determineWinner(
                     actualResult.home_score, 
                     actualResult.away_score
                 );
 
+                console.log('🎯 ===== CALCULANDO PUNTOS =====');
+                console.log('📊 Predicción recibida:', {
+                    predicted_winner: prediction.predicted_winner,
+                    predicted_score: `${prediction.predicted_home_score}-${prediction.predicted_away_score}`,
+                    user_id: prediction.user_id,
+                    match_id: prediction.match_id
+                });
+                console.log('⚽ Resultado real:', {
+                    actual_winner: actualWinner,
+                    actual_score: `${actualResult.home_score}-${actualResult.away_score}`
+                });
+                console.log('🏆 Configuración de fase:', {
+                    id: phase.id,
+                    name: phase.name,
+                    result_points: phase.result_points,
+                    exact_score_points: phase.exact_score_points,
+                    is_eliminatory: phase.is_eliminatory
+                });
+
+                // ✅ COMPARACIÓN DE GANADORES (con debugging extra)
+                console.log('🔍 Comparando ganadores:');
+                console.log(`   Predicho: "${prediction.predicted_winner}" (tipo: ${typeof prediction.predicted_winner})`);
+                console.log(`   Real: "${actualWinner}" (tipo: ${typeof actualWinner})`);
+                console.log(`   ¿Son iguales? ${prediction.predicted_winner === actualWinner}`);
+
                 if (prediction.predicted_winner === actualWinner) {
                     resultPoints = phase.result_points || 1;
+                    console.log(`✅ RESULTADO CORRECTO: +${resultPoints} puntos`);
+                } else {
+                    console.log(`❌ Resultado incorrecto`);
+                    console.log(`   - Se esperaba que ganara: "${prediction.predicted_winner}"`);
+                    console.log(`   - Pero ganó: "${actualWinner}"`);
                 }
 
+                // ✅ COMPARACIÓN DE MARCADORES
+                console.log('🔍 Comparando marcadores:');
+                console.log(`   Predicho: ${prediction.predicted_home_score}-${prediction.predicted_away_score}`);
+                console.log(`   Real: ${actualResult.home_score}-${actualResult.away_score}`);
+                
                 if (prediction.predicted_home_score === actualResult.home_score && 
                     prediction.predicted_away_score === actualResult.away_score) {
                     scorePoints = phase.exact_score_points || 3;
+                    console.log(`✅ MARCADOR EXACTO: +${scorePoints} puntos`);
+                } else {
+                    console.log(`❌ Marcador incorrecto`);
                 }
 
+                // Calcular bonus (para finales)
                 if (phase.name.toLowerCase().includes('final') && 
                     phase.winner_points > 0 && 
                     prediction.predicted_winner === actualWinner) {
                     bonusPoints = phase.winner_points;
+                    console.log(`🏆 BONUS FINAL: +${bonusPoints} puntos`);
                 }
+
+                const totalPoints = resultPoints + scorePoints + bonusPoints;
+                console.log(`🎯 RESUMEN FINAL:`);
+                console.log(`   - Puntos por resultado: ${resultPoints}`);
+                console.log(`   - Puntos por marcador: ${scorePoints}`);
+                console.log(`   - Puntos bonus: ${bonusPoints}`);
+                console.log(`   - TOTAL: ${totalPoints} puntos`);
+                console.log('🎯 ===========================');
 
                 resolve({
                     resultPoints,
                     scorePoints,
                     bonusPoints,
-                    totalPoints: resultPoints + scorePoints + bonusPoints,
+                    totalPoints: totalPoints,
                     phase_config: {
                         name: phase.name,
                         is_eliminatory: phase.is_eliminatory,
@@ -876,6 +928,7 @@ const pointsCalculator = {
     },
 
     calculateDefaultPoints: (prediction, actualResult) => {
+        console.log('🔧 Usando calculateDefaultPoints (sin fase)');
         let resultPoints = 0;
         let scorePoints = 0;
 
@@ -884,31 +937,56 @@ const pointsCalculator = {
             actualResult.away_score
         );
 
+        console.log('🎯 PUNTOS POR DEFECTO:');
+        console.log(`   Predicho: "${prediction.predicted_winner}", Real: "${actualWinner}"`);
+
         if (prediction.predicted_winner === actualWinner) {
             resultPoints = 1;
+            console.log(`✅ Resultado correcto: +${resultPoints} puntos`);
         }
 
         if (prediction.predicted_home_score === actualResult.home_score && 
             prediction.predicted_away_score === actualResult.away_score) {
             scorePoints = 3;
+            console.log(`✅ Marcador exacto: +${scorePoints} puntos`);
         }
+
+        const total = resultPoints + scorePoints;
+        console.log(`🎯 Total por defecto: ${total} puntos`);
 
         return {
             resultPoints,
             scorePoints,
             bonusPoints: 0,
-            totalPoints: resultPoints + scorePoints
+            totalPoints: total
         };
     },
 
     determineWinner: (homeScore, awayScore) => {
-        if (homeScore > awayScore) return 'home';
-        if (awayScore > homeScore) return 'away';
+        console.log(`🎲 Determinando ganador: home=${homeScore} (${typeof homeScore}), away=${awayScore} (${typeof awayScore})`);
+        
+        // Convertir a números para estar seguros
+        const home = parseInt(homeScore);
+        const away = parseInt(awayScore);
+        
+        console.log(`🎲 Convertidos a números: home=${home}, away=${away}`);
+        
+        if (home > away) {
+            console.log('🏠 Ganador determinado: "home"');
+            return 'home';
+        }
+        if (away > home) {
+            console.log('✈️ Ganador determinado: "away"');
+            return 'away';
+        }
+        console.log('🤝 Resultado determinado: "draw"');
         return 'draw';
     },
 
     updateMatchPredictions: (matchId, homeScore, awayScore) => {
         return new Promise((resolve, reject) => {
+            console.log(`🔄 Iniciando actualización de predicciones para partido ${matchId}: ${homeScore}-${awayScore}`);
+            
             db.get(`
                 SELECT m.*, tp.* 
                 FROM matches_new m
@@ -916,12 +994,23 @@ const pointsCalculator = {
                 WHERE m.id = ?
             `, [matchId], (err, match) => {
                 if (err) {
+                    console.error('❌ Error obteniendo match:', err);
                     return reject(err);
                 }
 
                 if (!match) {
+                    console.error('❌ Partido no encontrado:', matchId);
                     return reject(new Error('Partido no encontrado'));
                 }
+
+                console.log('📊 Información del partido:', {
+                    id: match.id,
+                    home_team: match.home_team,
+                    away_team: match.away_team,
+                    phase_id: match.phase_id,
+                    phase_name: match.name,
+                    is_eliminatory: match.is_eliminatory
+                });
 
                 if (match.is_eliminatory && homeScore === awayScore) {
                     return reject(new Error(
@@ -936,6 +1025,7 @@ const pointsCalculator = {
                     SELECT * FROM predictions_new WHERE match_id = ?
                 `, [matchId], async (err, predictions) => {
                     if (err) {
+                        console.error('❌ Error obteniendo predicciones:', err);
                         return reject(err);
                     }
 
@@ -944,6 +1034,7 @@ const pointsCalculator = {
                     let updatedCount = 0;
 
                     if (predictions.length === 0) {
+                        console.log('⚠️ No hay predicciones para este partido');
                         return resolve({ 
                             updated: 0, 
                             message: 'No hay predicciones para este partido',
@@ -956,11 +1047,15 @@ const pointsCalculator = {
 
                     for (const prediction of predictions) {
                         try {
+                            console.log(`\n🎯 Procesando predicción del usuario ${prediction.user_id}:`);
+                            
                             const points = await pointsCalculator.calculatePredictionPoints(
                                 prediction, 
                                 actualResult, 
                                 match.phase_id
                             );
+
+                            console.log(`💾 Guardando ${points.totalPoints} puntos para usuario ${prediction.user_id}`);
 
                             await new Promise((resolveUpdate, rejectUpdate) => {
                                 db.run(`
@@ -973,7 +1068,7 @@ const pointsCalculator = {
                                         console.error('❌ Error actualizando predicción:', updateErr);
                                         rejectUpdate(updateErr);
                                     } else {
-                                        console.log(`✅ Usuario ${prediction.user_id}: ${points.totalPoints} puntos`);
+                                        console.log(`✅ Usuario ${prediction.user_id}: ${points.totalPoints} puntos actualizados en BD`);
                                         resolveUpdate();
                                     }
                                 });
@@ -984,6 +1079,8 @@ const pointsCalculator = {
                             console.error(`❌ Error procesando predicción ${prediction.id}:`, error);
                         }
                     }
+
+                    console.log(`🎉 Actualización completa: ${updatedCount} predicciones procesadas`);
 
                     resolve({ 
                         updated: updatedCount, 
@@ -998,6 +1095,7 @@ const pointsCalculator = {
         });
     }
 };
+
 
 // ============= CERRAR BASE DE DATOS =============
 process.on('SIGINT', () => {
