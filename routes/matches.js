@@ -1,8 +1,9 @@
 // routes/matches.js - Rutas de partidos
 const express = require('express');
-const { authenticateToken } = require('./auth');
+const { authenticateToken, requireAdmin } = require('./auth'); // ✅ Importar todo junto
 
 const router = express.Router();
+
 
 // GET /api/matches/upcoming - VERSIÓN CON PAGINACIÓN Y FILTROS
 router.get('/upcoming', authenticateToken, async (req, res) => {
@@ -152,118 +153,117 @@ router.get('/', authenticateToken, async (req, res) => {
 });
 
 
-
-const { requireAdmin } = require('./auth');
-const { pointsCalculator } = require('../database');
-
-// POST /api/matches/:matchId/result - Actualizar resultado de partido (solo admin)
-// POST /api/matches/:matchId/result - Actualizar resultado con validación de fases eliminatorias
+// POST /api/matches/:matchId/result - Actualizar resultado (VERSIÓN SIMPLIFICADA)
 router.post('/:matchId/result', authenticateToken, requireAdmin, async (req, res) => {
     try {
         const { matchId } = req.params;
         const { home_score, away_score, penalty_winner } = req.body;
 
+        console.log(`⚽ Actualizando resultado del partido ${matchId}:`, {
+            home_score, away_score, penalty_winner
+        });
+
         // Validaciones básicas
+        if (home_score === undefined || away_score === undefined) {
+            return res.status(400).json({ error: 'Los marcadores son requeridos' });
+        }
+
         if (home_score < 0 || away_score < 0) {
-            return res.status(400).json({ 
-                error: 'Los goles no pueden ser negativos' 
-            });
+            return res.status(400).json({ error: 'Los goles no pueden ser negativos' });
         }
 
         if (home_score > 20 || away_score > 20) {
-            return res.status(400).json({ 
-                error: 'Marcador muy alto, verifica los datos' 
-            });
+            return res.status(400).json({ error: 'Marcador muy alto, verifica los datos' });
         }
 
         const { db } = require('../database');
 
-        // Primero validar si es fase eliminatoria
-        const validationResponse = await fetch(`http://localhost:${process.env.PORT || 3000}/api/admin/phases/validate-elimination`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': req.headers.authorization
-            },
-            body: JSON.stringify({ match_id: matchId, home_score, away_score })
-        }).catch(() => null);
-
-        if (validationResponse && !validationResponse.ok) {
-            const validationError = await validationResponse.json();
-            
-            // Si es fase eliminatoria con empate, requerir información adicional
-            if (validationError.is_eliminatory && home_score === away_score) {
-                if (!penalty_winner) {
-                    return res.status(400).json({
-                        error: validationError.error,
-                        suggestion: validationError.suggestion,
-                        requires_penalty_winner: true,
-                        is_eliminatory: true
-                    });
-                }
-                
-                // Verificar que penalty_winner sea válido
-                if (penalty_winner !== 'home' && penalty_winner !== 'away') {
-                    return res.status(400).json({
-                        error: 'Para fases eliminatorias con empate, debe especificarse quién ganó en penaltis',
-                        requires_penalty_winner: true
-                    });
-                }
-            }
-        }
-
-        // Actualizar resultado del partido
-        db.run(`
-            UPDATE matches_new 
-            SET home_score = ?, away_score = ?, status = 'finished', 
-                penalty_winner = ?, updated_at = datetime('now')
-            WHERE id = ?
-        `, [home_score, away_score, penalty_winner || null, matchId], async function(err) {
+        // Verificar que el partido existe y obtener información
+        db.get(`
+            SELECT m.*, tp.name as phase_name, tp.is_eliminatory, 
+                   t.name as tournament_name
+            FROM matches_new m
+            LEFT JOIN tournament_phases tp ON m.phase_id = tp.id
+            LEFT JOIN tournaments t ON m.tournament_id = t.id
+            WHERE m.id = ?
+        `, [matchId], (err, match) => {
             if (err) {
-                console.error('Error actualizando partido:', err);
-                return res.status(500).json({ error: 'Error actualizando partido' });
+                console.error('❌ Error verificando partido:', err);
+                return res.status(500).json({ error: 'Error verificando partido' });
             }
 
-            if (this.changes === 0) {
+            if (!match) {
                 return res.status(404).json({ error: 'Partido no encontrado' });
             }
 
-            try {
-                // Calcular puntos para todas las predicciones
-                const { pointsCalculator } = require('../database');
-                const result = await pointsCalculator.updateMatchPredictions(
-                    matchId, 
-                    home_score, 
-                    away_score
-                );
+            if (match.status === 'finished') {
+                return res.status(400).json({ error: 'Este partido ya tiene resultado final' });
+            }
 
-                console.log(`🏆 Resultado actualizado: ${matchId} (${home_score}-${away_score})`);
-                if (penalty_winner) {
-                    console.log(`🥅 Ganador en penaltis: ${penalty_winner}`);
+            // Validar fase eliminatoria
+            if (match.is_eliminatory && home_score === away_score && !penalty_winner) {
+                return res.status(400).json({
+                    error: `Esta es una fase eliminatoria (${match.phase_name}). No se permiten empates.`,
+                    suggestion: 'Debe definirse un ganador. Si hubo empate en 90 minutos, ingresa el resultado después de penaltis.',
+                    requires_penalty_winner: true,
+                    is_eliminatory: true
+                });
+            }
+
+            // Determinar ganador
+            let winner = 'draw';
+            if (home_score > away_score) {
+                winner = 'home';
+            } else if (away_score > home_score) {
+                winner = 'away';
+            }
+
+            // Si hay ganador por penaltis
+            if (home_score === away_score && penalty_winner) {
+                winner = penalty_winner;
+            }
+
+            // Actualizar resultado del partido
+            db.run(`
+                UPDATE matches_new 
+                SET home_score = ?, 
+                    away_score = ?, 
+                    status = 'finished',
+                    penalty_winner = ?,
+                    updated_at = NOW()
+                WHERE id = ?
+            `, [home_score, away_score, penalty_winner || null, matchId], function(err) {
+                if (err) {
+                    console.error('❌ Error actualizando partido:', err);
+                    return res.status(500).json({ error: 'Error actualizando resultado: ' + err.message });
                 }
-                console.log(`📊 ${result.message}`);
+
+                if (this.changes === 0) {
+                    return res.status(404).json({ error: 'Partido no encontrado' });
+                }
+
+                console.log(`✅ Resultado actualizado: ${match.home_team} ${home_score}-${away_score} ${match.away_team}`);
+
+                // Calcular puntos básico (placeholder)
+                calculateBasicPredictionPoints(matchId, home_score, away_score, winner);
 
                 res.json({
                     message: 'Resultado actualizado exitosamente',
                     match_id: matchId,
-                    score: `${home_score}-${away_score}`,
+                    score: `${match.home_team} ${home_score}-${away_score} ${match.away_team}`,
                     penalty_winner: penalty_winner || null,
-                    predictions_updated: result.updated,
-                    phase_info: result.phase_info
+                    predictions_updated: 0, // Placeholder
+                    phase_info: {
+                        name: match.phase_name,
+                        is_eliminatory: match.is_eliminatory
+                    }
                 });
-
-            } catch (pointsError) {
-                console.error('Error calculando puntos:', pointsError);
-                res.status(500).json({ 
-                    error: 'Resultado actualizado pero error calculando puntos',
-                    details: pointsError.message 
-                });
-            }
+            });
         });
 
     } catch (error) {
-        console.error('Error actualizando resultado:', error);
-        res.status(500).json({ error: 'Error interno del servidor' });
+        console.error('❌ Error actualizando resultado:', error);
+        res.status(500).json({ error: 'Error interno del servidor: ' + error.message });
     }
 });
 
