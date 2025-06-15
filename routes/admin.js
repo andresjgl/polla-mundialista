@@ -1434,6 +1434,55 @@ router.post('/matches', authenticateToken, requireAdmin, async (req, res) => {
     }
 });
 
+// POST /api/admin/reset-match/:matchId - FUNCIÓN TEMPORAL PARA TESTING
+router.post('/reset-match/:matchId', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const { matchId } = req.params;
+        console.log(`🔄 Reseteando partido ${matchId} para testing...`);
+        
+        const { db } = require('../database');
+        
+        // Resetear el partido a estado original
+        db.run(`
+            UPDATE matches_new 
+            SET home_score = NULL, 
+                away_score = NULL, 
+                status = 'scheduled',
+                penalty_winner = NULL,
+                updated_at = NOW()
+            WHERE id = ?
+        `, [matchId], function(err) {
+            if (err) {
+                console.error('❌ Error reseteando partido:', err);
+                return res.status(500).json({ error: 'Error reseteando partido' });
+            }
+            
+            console.log(`✅ Partido ${matchId} reseteado`);
+            
+            // También resetear las predicciones
+            db.run(`
+                UPDATE predictions_new 
+                SET points_earned = 0, result_points = 0, score_points = 0, updated_at = NOW()
+                WHERE match_id = ?
+            `, [matchId], function(err2) {
+                if (err2) {
+                    console.error('❌ Error reseteando predicciones:', err2);
+                }
+                
+                console.log(`✅ Predicciones del partido ${matchId} reseteadas`);
+                
+                res.json({
+                    message: 'Partido reseteado exitosamente',
+                    match_id: matchId
+                });
+            });
+        });
+        
+    } catch (error) {
+        console.error('❌ Error reseteando partido:', error);
+        res.status(500).json({ error: 'Error interno del servidor' });
+    }
+});
 
 
 module.exports = router;
