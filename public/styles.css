@@ -2441,3 +2441,182 @@ main {
         justify-content: center;
     }
 }
+
+
+/* ===== PREDICCIONES CON PAGINACIÓN ===== */
+.predictions-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.predictions-header h3 {
+    margin: 0;
+    color: #1f2937;
+}
+
+.prediction-card {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+    transition: all 0.2s ease;
+}
+
+.prediction-card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    transform: translateY(-2px);
+}
+
+.prediction-card.finished {
+    border-left: 4px solid #10b981;
+}
+
+.prediction-card.pending {
+    border-left: 4px solid #f59e0b;
+}
+
+.prediction-card.has-points {
+    background: linear-gradient(135deg, #ecfdf5 0%, #ffffff 100%);
+}
+
+.prediction-match {
+    margin-bottom: 1rem;
+}
+
+.match-teams {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin-bottom: 0.5rem;
+}
+
+.match-date {
+    margin-bottom: 0.25rem;
+}
+
+.phase-info {
+    color: #6b7280;
+}
+
+.prediction-details {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 1rem;
+    align-items: center;
+}
+
+.prediction-score {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.prediction-label,
+.result-label {
+    font-size: 0.875rem;
+    color: #6b7280;
+}
+
+.prediction-value {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: #4f46e5;
+}
+
+.actual-result {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.result-value {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: #059669;
+}
+
+.prediction-points {
+    text-align: right;
+}
+
+.points-earned {
+    font-size: 1.25rem;
+    font-weight: 700;
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+}
+
+.points-earned.positive {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.points-earned.zero {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.status-pending {
+    color: #d97706;
+    font-weight: 500;
+    font-style: italic;
+}
+
+/* ===== ESTADOS DE LOADING ===== */
+.loading-state,
+.error-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem 2rem;
+    text-align: center;
+    min-height: 200px;
+}
+
+.loading-spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid #e2e8f0;
+    border-top: 4px solid #667eea;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-bottom: 1rem;
+}
+
+.error-icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    color: #ef4444;
+}
+
+/* ===== RESPONSIVE DESIGN ===== */
+@media (max-width: 768px) {
+    .predictions-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .prediction-details {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+        text-align: left;
+    }
+    
+    .prediction-points {
+        text-align: left;
+    }
+    
+    .filter-controls {
+        width: 100%;
+    }
+    
+    .filter-buttons {
+        flex-wrap: wrap;
+    }
+}

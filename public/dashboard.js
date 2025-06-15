@@ -4,6 +4,11 @@ let currentPage = 1;
 let currentFilter = 'all';
 const matchesPerPage = 10;
 
+// ===== NUEVAS VARIABLES PARA PREDICCIONES =====
+let currentPredictionsPage = 1;
+let currentPredictionsFilter = 'all';
+const predictionsPerPage = 10;
+
 
 document.addEventListener('DOMContentLoaded', async () => {
     const token = localStorage.getItem('token');
@@ -29,7 +34,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             await loadUserStats(user.id);
             await loadLeaderboard();
             await loadUpcomingMatches();
-            await loadUserPredictions();
+            await loadUserPredictions(1, 'all');
         }
     }
 
@@ -425,48 +430,215 @@ async function displayUpcomingMatches(matches) {
 }
 
 
-// Reemplaza la función existente en public/dashboard.js
-async function loadUserPredictions() {
+// ============= GESTIÓN DE PREDICCIONES CON PAGINACIÓN =============
+
+async function loadUserPredictions(page = 1, filter = 'all') {
     const container = document.getElementById('myPredictions');
+    
+    // Mostrar loading
+    container.innerHTML = `
+        <div class="loading-state">
+            <div class="loading-spinner"></div>
+            <p>Cargando tus predicciones...</p>
+        </div>
+    `;
+    
     try {
-        // ✅ CORRECCIÓN: Nos aseguramos de llamar a la ruta correcta '/api/predictions/user'
-        const response = await fetchWithAuth(`/api/predictions/user`);
+        console.log(`📊 Cargando predicciones - Página: ${page}, Filtro: ${filter}`);
         
-        // Si el token expiró, la función devuelve null y paramos aquí.
+        // Construir URL con parámetros
+        const params = new URLSearchParams({
+            page: page,
+            limit: predictionsPerPage,
+            status: filter
+        });
+        
+        const response = await fetchWithAuth(`/api/predictions/user?${params}`);
+        
         if (!response) return;
 
         if (!response.ok) {
-            // Si el servidor responde con un error (ej. 500), lo mostramos.
             const errorData = await response.json();
-            throw new Error(errorData.error || 'Respuesta no válida del servidor');
+            throw new Error(errorData.error || 'Error del servidor');
         }
         
-        const predictions = await response.json();
-
-        // ✅ MEJORA: Manejo explícito de cuando no hay predicciones.
-        if (!predictions || predictions.length === 0) {
-            container.innerHTML = `<div class="no-data"><p>📝 Aún no has hecho predicciones.</p><small>Tus predicciones aparecerán aquí.</small></div>`;
-            return;
-        }
-
-        // Si hay predicciones, las mostramos.
-        container.innerHTML = predictions.map(p => `
-            <div class="prediction-card">
-                <div class="prediction-match"><strong>${p.home_team} vs ${p.away_team}</strong><small>${formatFullDate(p.match_date)}</small></div>
-                <div class="prediction-details">
-                    <span class="prediction-score">Tu pronóstico: ${p.predicted_home_score} - ${p.predicted_away_score}</span>
-                    <span class="prediction-points ${p.status === 'finished' ? (p.points_earned > 0 ? 'points-earned' : '') : ''}">
-                        ${p.status === 'finished' ? `${p.points_earned || 0} pts` : 'Pendiente'}
-                    </span>
-                </div>
+        const data = await response.json();
+        console.log('📊 Datos de predicciones recibidos:', data);
+        
+        // Actualizar variables globales
+        currentPredictionsPage = page;
+        currentPredictionsFilter = filter;
+        
+        // Mostrar predicciones con paginación
+        displayUserPredictionsWithPagination(data);
+        
+    } catch (error) {
+        console.error('❌ Error cargando predicciones:', error);
+        container.innerHTML = `
+            <div class="error-state">
+                <div class="error-icon">⚠️</div>
+                <p>Error cargando tus predicciones</p>
+                <button class="btn btn-secondary btn-small" onclick="loadUserPredictions()">
+                    🔄 Reintentar
+                </button>
             </div>
-        `).join('');
-
-    } catch(error) {
-        console.error('Error cargando predicciones de usuario:', error);
-        container.innerHTML = `<div class="no-data"><p>Error al cargar tus predicciones.</p><button class="btn btn-secondary btn-small" onclick="loadUserPredictions()">Reintentar</button></div>`;
+        `;
     }
 }
+
+function displayUserPredictionsWithPagination(data) {
+    const container = document.getElementById('myPredictions');
+    const { predictions, pagination, filters } = data;
+    
+    console.log('🎯 Mostrando predicciones con paginación:', {
+        predictions: predictions.length,
+        pagination,
+        filters
+    });
+    
+    if (!predictions || predictions.length === 0) {
+        container.innerHTML = `
+            <div class="predictions-header">
+                <h3>📝 Mis Predicciones</h3>
+                ${createPredictionsFilterControls(pagination?.totalPredictions || 0, filters.status)}
+            </div>
+            <div class="no-data">
+                <p>📝 ${filters.status === 'pending' ? 'No tienes predicciones pendientes' : 
+                    filters.status === 'finished' ? 'No tienes predicciones finalizadas' : 
+                    'Aún no has hecho predicciones'}</p>
+                <small>Tus predicciones aparecerán aquí cuando predecir partidos.</small>
+            </div>
+        `;
+        return;
+    }
+
+    // Generar HTML
+    const headerHTML = `
+        <div class="predictions-header">
+            <h3>📝 Mis Predicciones</h3>
+            ${createPredictionsFilterControls(pagination.totalPredictions, filters.status)}
+            ${createPredictionsPaginationInfo(pagination)}
+        </div>
+    `;
+
+    const predictionsHTML = predictions.map(p => {
+        const isFinished = p.status === 'finished';
+        const pointsEarned = p.points_earned || 0;
+        const hasPoints = isFinished && pointsEarned > 0;
+        
+        return `
+            <div class="prediction-card ${isFinished ? 'finished' : 'pending'} ${hasPoints ? 'has-points' : ''}">
+                <div class="prediction-match">
+                    <div class="match-teams">
+                        <strong>${p.home_team} vs ${p.away_team}</strong>
+                    </div>
+                    <div class="match-date">
+                        <small>${formatFullDate(p.match_date)}</small>
+                    </div>
+                    <div class="phase-info">
+                        <small>📋 ${p.phase_name || 'Sin fase'} - ${p.tournament_name || 'Sin torneo'}</small>
+                    </div>
+                </div>
+                
+                <div class="prediction-details">
+                    <div class="prediction-score">
+                        <span class="prediction-label">Tu pronóstico:</span>
+                        <span class="prediction-value">${p.predicted_home_score} - ${p.predicted_away_score}</span>
+                    </div>
+                    
+                    ${isFinished ? `
+                        <div class="actual-result">
+                            <span class="result-label">Resultado:</span>
+                            <span class="result-value">${p.actual_home_score} - ${p.actual_away_score}</span>
+                        </div>
+                    ` : ''}
+                    
+                    <div class="prediction-points">
+                        ${isFinished ? `
+                            <span class="points-earned ${hasPoints ? 'positive' : 'zero'}">
+                                ${pointsEarned} pts
+                            </span>
+                        ` : `
+                            <span class="status-pending">Pendiente</span>
+                        `}
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    const paginationHTML = createPredictionsPaginationControls(pagination);
+
+    container.innerHTML = headerHTML + predictionsHTML + paginationHTML;
+    console.log('✅ Predicciones con paginación renderizadas exitosamente');
+}
+
+// Crear controles de filtro para predicciones
+function createPredictionsFilterControls(total, currentFilter) {
+    return `
+        <div class="filter-controls">
+            <div class="filter-buttons">
+                <button class="btn btn-small ${currentFilter === 'all' ? 'btn-primary' : 'btn-secondary'}" 
+                        onclick="changePredictionsFilter('all')">
+                    Todas (${total})
+                </button>
+                <button class="btn btn-small ${currentFilter === 'pending' ? 'btn-primary' : 'btn-secondary'}" 
+                        onclick="changePredictionsFilter('pending')">
+                    Pendientes
+                </button>
+                <button class="btn btn-small ${currentFilter === 'finished' ? 'btn-primary' : 'btn-secondary'}" 
+                        onclick="changePredictionsFilter('finished')">
+                    Finalizadas
+                </button>
+            </div>
+        </div>
+    `;
+}
+
+// Crear información de paginación para predicciones
+function createPredictionsPaginationInfo(pagination) {
+    return `
+        <div class="pagination-info">
+            <small>Mostrando ${pagination.startIndex}-${pagination.endIndex} de ${pagination.totalPredictions} predicciones</small>
+        </div>
+    `;
+}
+
+// Crear controles de paginación para predicciones
+function createPredictionsPaginationControls(pagination) {
+    if (pagination.totalPages <= 1) return '';
+    
+    return `
+        <div class="pagination-controls">
+            <button class="btn btn-secondary btn-small" 
+                    ${!pagination.hasPrevious ? 'disabled' : ''} 
+                    onclick="changePredictionsPage(${pagination.currentPage - 1})">
+                « Anterior
+            </button>
+            
+            <span class="page-info">
+                Página ${pagination.currentPage} de ${pagination.totalPages}
+            </span>
+            
+            <button class="btn btn-secondary btn-small" 
+                    ${!pagination.hasNext ? 'disabled' : ''} 
+                    onclick="changePredictionsPage(${pagination.currentPage + 1})">
+                Siguiente »
+            </button>
+        </div>
+    `;
+}
+
+// Funciones de navegación para predicciones
+window.changePredictionsPage = function(page) {
+    if (page >= 1) {
+        loadUserPredictions(page, currentPredictionsFilter);
+    }
+};
+
+window.changePredictionsFilter = function(filter) {
+    loadUserPredictions(1, filter); // Volver a página 1 al cambiar filtro
+};
 
 
 // --- FIN NUEVAS FUNCIONES ---
