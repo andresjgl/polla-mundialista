@@ -293,65 +293,112 @@ router.post('/:matchId/result', authenticateToken, requireAdmin, async (req, res
 });
 
 
-// GET /api/matches/with-predictions - Obtener partidos con predicciones (CORREGIDA)
+// GET /api/matches/with-predictions - Obtener partidos con predicciones (MEJORADO)
 router.get('/with-predictions', authenticateToken, requireAdmin, async (req, res) => {
-    console.log('🔍 GET /matches/with-predictions solicitado');
-    
     try {
+        const { page = 1, limit = 10, tournament_id, status = 'all' } = req.query;
+        const offset = (page - 1) * limit;
+        
+        console.log(`📊 Obteniendo partidos paginados - Página: ${page}, Límite: ${limit}`);
+        
         const { db } = require('../database');
         
-        // CONSULTA COMPLETA CON TODOS LOS CAMPOS NECESARIOS
-        const query = `
+        // Construir filtros
+        let whereConditions = [];
+        let queryParams = [];
+        
+        if (tournament_id && tournament_id !== '') {
+            whereConditions.push('m.tournament_id = ?');
+            queryParams.push(tournament_id);
+        }
+        
+        if (status && status !== 'all') {
+            whereConditions.push('m.status = ?');
+            queryParams.push(status);
+        }
+        
+        const whereClause = whereConditions.length > 0 
+            ? `WHERE ${whereConditions.join(' AND ')}` 
+            : '';
+        
+        // Contar total de partidos
+        const countQuery = `
+            SELECT COUNT(*) as total
+            FROM matches_new m
+            LEFT JOIN tournaments t ON m.tournament_id = t.id
+            ${whereClause}
+        `;
+        
+        const totalResult = await new Promise((resolve, reject) => {
+            db.get(countQuery, queryParams, (err, result) => {
+                if (err) reject(err);
+                else resolve(result);
+            });
+        });
+        
+        const total = totalResult?.total || 0;
+        const totalPages = Math.ceil(total / limit);
+        
+        // Obtener partidos paginados con orden cronológico
+        const matchesQuery = `
             SELECT 
-                m.id,
-                m.home_team,
-                m.away_team,
-                m.match_date,
-                m.home_score,
-                m.away_score,
-                m.status,
-                m.tournament_id,
-                m.phase_id,
-                COALESCE(t.name, 'Sin torneo') as tournament_name,
-                COALESCE(tp.name, 'Sin fase') as phase_name,
-                COALESCE(tp.points_multiplier, 1) as points_multiplier,
-                COALESCE(tp.result_points, 1) as result_points,
-                COALESCE(tp.exact_score_points, 3) as exact_score_points,
-                COALESCE(tp.is_eliminatory, false) as is_eliminatory,
-                (SELECT COUNT(*) FROM predictions_new p WHERE p.match_id = m.id) as predictions_count
+                m.*,
+                t.name as tournament_name,
+                tp.name as phase_name,
+                tp.is_eliminatory,
+                COUNT(p.id) as predictions_count
             FROM matches_new m
             LEFT JOIN tournaments t ON m.tournament_id = t.id
             LEFT JOIN tournament_phases tp ON m.phase_id = tp.id
-            ORDER BY m.match_date DESC
-            LIMIT 50
+            LEFT JOIN predictions_new p ON m.id = p.match_id
+            ${whereClause}
+            GROUP BY m.id, t.name, tp.name, tp.is_eliminatory
+            ORDER BY m.match_date ASC, m.id ASC
+            LIMIT ? OFFSET ?
         `;
         
-        console.log('🔧 Ejecutando consulta completa de partidos...');
+        const finalParams = [...queryParams, parseInt(limit), parseInt(offset)];
         
-        db.all(query, [], (err, matches) => {
-            if (err) {
-                console.error('❌ Error obteniendo partidos:', err);
-                console.log('📤 Devolviendo array vacío por error');
-                return res.json([]);
+        const matches = await new Promise((resolve, reject) => {
+            db.all(matchesQuery, finalParams, (err, matches) => {
+                if (err) {
+                    console.error('❌ Error obteniendo partidos:', err);
+                    reject(err);
+                } else {
+                    console.log(`✅ ${matches?.length || 0} partidos obtenidos`);
+                    resolve(matches || []);
+                }
+            });
+        });
+        
+        // Calcular información de paginación
+        const hasNextPage = page < totalPages;
+        const hasPrevPage = page > 1;
+        
+        res.json({
+            matches,
+            pagination: {
+                currentPage: parseInt(page),
+                totalPages,
+                totalMatches: total,
+                limit: parseInt(limit),
+                hasNextPage,
+                hasPrevPage,
+                startIndex: offset + 1,
+                endIndex: Math.min(offset + matches.length, total)
+            },
+            filters: {
+                tournament_id,
+                status
             }
-            
-            console.log(`✅ Partidos encontrados: ${matches ? matches.length : 0}`);
-            if (matches && matches.length > 0) {
-                console.log('📊 Primer partido con datos:', {
-                    id: matches[0].id,
-                    teams: `${matches[0].home_team} vs ${matches[0].away_team}`,
-                    phase_name: matches[0].phase_name,
-                    points_multiplier: matches[0].points_multiplier,
-                    predictions_count: matches[0].predictions_count
-                });
-            }
-            
-            res.json(matches || []);
         });
         
     } catch (error) {
-        console.error('❌ Error en route matches/with-predictions:', error);
-        res.json([]);
+        console.error('❌ Error obteniendo partidos paginados:', error);
+        res.status(500).json({ 
+            error: 'Error obteniendo partidos',
+            details: error.message 
+        });
     }
 });
 
