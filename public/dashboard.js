@@ -227,24 +227,29 @@ async function displayUpcomingMatchesWithPagination(data) {
         return;
     }
 
-    // En dashboard.js, en displayUpcomingMatchesWithPagination, después de cargar predicciones:
-
     try {
-        // Cargar predicciones del usuario
+        // Cargar predicciones del usuario  
         const predictionsResponse = await fetchWithAuth('/api/predictions/user');
-        const userPredictions = predictionsResponse && predictionsResponse.ok ? 
-            await predictionsResponse.json() : [];
+        let userPredictions = [];
+
+        if (predictionsResponse && predictionsResponse.ok) {
+            const data = await predictionsResponse.json();
+            
+            // Manejar ambos formatos: objeto con paginación o array directo
+            if (data && data.predictions && Array.isArray(data.predictions)) {
+                userPredictions = data.predictions;
+            } else if (Array.isArray(data)) {
+                userPredictions = data;
+            }
+        }
         
-        // ✅ AGREGAR ESTOS LOGS DE DEBUGGING:
-        console.log('🔍 Predicciones raw del API:', userPredictions);
-        console.log('🔍 Cantidad de predicciones:', userPredictions?.length);
-        console.log('🔍 Partidos en esta página:', matches.map(m => ({ id: m.id, teams: `${m.home_team} vs ${m.away_team}` })));
+        console.log('🔍 Predicciones finales:', userPredictions.length);
         
         const predictionsMap = new Map();
         if (Array.isArray(userPredictions)) {
             userPredictions.forEach(p => {
                 predictionsMap.set(p.match_id, p);
-                console.log(`🔍 Mapeando predicción: match_id=${p.match_id}, predicción=${p.predicted_home_score}-${p.predicted_away_score}`);
+                console.log(`🔍 Mapeando: ${p.match_id} -> ${p.predicted_home_score}-${p.predicted_away_score}`);
             });
         }
         
