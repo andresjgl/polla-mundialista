@@ -229,31 +229,51 @@ async function displayUpcomingMatchesWithPagination(data) {
 
     try {
         // Cargar predicciones del usuario  
-        const predictionsResponse = await fetchWithAuth('/api/predictions/user');
+        // ✅ CÓDIGO CORREGIDO - Usar mismos parámetros que "Mis Predicciones"
+        const allPredictionsParams = new URLSearchParams({
+            page: 1,
+            limit: 1000, // Obtener TODAS las predicciones del usuario
+            status: 'all'
+        });
+
+        const predictionsResponse = await fetchWithAuth(`/api/predictions/user?${allPredictionsParams}`);
         let userPredictions = [];
 
         if (predictionsResponse && predictionsResponse.ok) {
             const data = await predictionsResponse.json();
             
-            // Manejar ambos formatos: objeto con paginación o array directo
+            console.log('🔍 [PRÓXIMOS PARTIDOS] Predicciones cargadas:', data);
+            
+            // La API SIEMPRE devuelve formato: {predictions: [], pagination: {}}
             if (data && data.predictions && Array.isArray(data.predictions)) {
                 userPredictions = data.predictions;
-            } else if (Array.isArray(data)) {
-                userPredictions = data;
+                console.log('✅ Total predicciones encontradas:', userPredictions.length);
+            } else {
+                console.warn('⚠️ Formato inesperado de predicciones:', data);
+                userPredictions = [];
             }
+        } else {
+            console.error('❌ Error cargando predicciones para próximos partidos');
         }
+
         
         console.log('🔍 Predicciones finales:', userPredictions.length);
         
         const predictionsMap = new Map();
-        if (Array.isArray(userPredictions)) {
+        if (Array.isArray(userPredictions) && userPredictions.length > 0) {
             userPredictions.forEach(p => {
-                predictionsMap.set(p.match_id, p);
-                console.log(`🔍 Mapeando: ${p.match_id} -> ${p.predicted_home_score}-${p.predicted_away_score}`);
+                if (p.match_id) {
+                    predictionsMap.set(p.match_id, p);
+                    console.log(`🔍 [MAPEO] ${p.match_id} -> ${p.predicted_home_score}-${p.predicted_away_score}`);
+                }
             });
+        } else {
+            console.warn('⚠️ No hay predicciones para mapear');
         }
-        
-        console.log('🔍 Mapa de predicciones:', Array.from(predictionsMap.entries()));
+
+        console.log('📊 [RESUMEN] Predicciones mapeadas:', predictionsMap.size);
+        console.log('📊 [RESUMEN] Partidos a mostrar:', matches.length);
+
 
 
         // Generar HTML
