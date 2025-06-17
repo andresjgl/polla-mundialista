@@ -412,6 +412,42 @@ router.get('/user/predictions', authenticateToken, async (req, res) => {
     }
 });
 
+// GET /api/auth/me - Obtener información del usuario actual
+router.get('/me', authenticateToken, (req, res) => {
+    try {
+        console.log('🔍 GET /auth/me solicitado para usuario:', req.user.id);
+        
+        const { db } = require('../database');
+        
+        db.get('SELECT id, name, email, is_active, is_admin FROM users WHERE id = ?', [req.user.id], (err, user) => {
+            if (err) {
+                console.error('❌ Error obteniendo usuario actual:', err);
+                return res.status(500).json({ error: 'Error interno del servidor' });
+            }
+            
+            if (!user) {
+                console.log('⚠️ Usuario no encontrado:', req.user.id);
+                return res.status(404).json({ error: 'Usuario no encontrado' });
+            }
+            
+            console.log('✅ Usuario actual encontrado:', user.name);
+            
+            res.json({
+                id: user.id,
+                name: user.name,
+                email: user.email,
+                is_active: user.is_active,
+                is_admin: user.is_admin || false
+            });
+        });
+        
+    } catch (error) {
+        console.error('❌ Error en ruta /auth/me:', error);
+        res.status(500).json({ error: 'Error interno del servidor' });
+    }
+});
+
+
 module.exports = {
     router,
     authenticateToken,
