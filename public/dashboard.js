@@ -131,13 +131,28 @@ async function loadUserStats(userId) {
         const response = await fetchWithAuth(`/api/leaderboard/user/${userId}`);
         if (!response || !response.ok) return;
         const stats = await response.json();
+        
+        // Actualizar puntos
         document.getElementById('userPoints').textContent = stats.total_points || 0;
-        document.getElementById('userPosition').textContent = `#${stats.position || '-'}`;
+        
+        // Actualizar posición con emoji y color
+        const position = stats.position || 0;
+        const medalEmoji = getMedalEmoji(position);
+        const positionText = position > 0 ? `${medalEmoji}#${position}` : '#-';
+        
+        document.getElementById('userPosition').textContent = positionText;
         document.getElementById('totalParticipants').textContent = stats.total_participants || 0;
+        
+        // ✨ APLICAR COLORES SEGÚN LA POSICIÓN
+        applyPositionColors(position);
+        
+        console.log(`🏆 Posición del usuario: ${position} - Color aplicado`);
+        
     } catch (error) {
         console.error('Error cargando estadísticas del usuario:', error);
     }
 }
+
 
 async function loadLeaderboard() {
     const container = document.getElementById('leaderboardContainer');
@@ -151,21 +166,69 @@ async function loadLeaderboard() {
             return;
         }
         const top10 = leaderboard.slice(0, 10);
-        container.innerHTML = `<div class="leaderboard-header-row">
-                    <div class="pos">Pos.</div>
-                    <div class="name">Participante</div>
-                    <div class="points">Puntos</div>
-                </div><div class="leaderboard-table">${top10.map(user => `
-            <div class="leaderboard-row ${user.id == JSON.parse(localStorage.getItem('user')).id ? 'current-user' : ''}">
-                <div class="pos">#${user.position}</div>
-                <div class="name">${user.name}</div>
-                <div class="points"><strong>${user.total_points || 0}</strong> pts</div>
-            </div>`).join('')}</div>`;
+        container.innerHTML = `
+            <div class="leaderboard-header-row">
+                <div class="pos">Pos.</div>
+                <div class="name">Participante</div>
+                <div class="points">Puntos</div>
+            </div>
+            <div class="leaderboard-table">
+                ${top10.map(user => {
+                    const isCurrentUser = user.id == JSON.parse(localStorage.getItem('user')).id;
+                    const medalEmoji = getMedalEmoji(user.position);
+                    const positionClass = user.position <= 3 ? 'top-three' : '';
+                    
+                    return `
+                    <div class="leaderboard-row ${isCurrentUser ? 'current-user' : ''} ${positionClass}">
+                        <div class="pos">${medalEmoji}#${user.position}</div>
+                        <div class="name">${user.name}</div>
+                        <div class="points"><strong>${user.total_points || 0}</strong> pts</div>
+                    </div>`;
+                }).join('')}
+            </div>
+        `;
     } catch (error) {
         console.error('Error en loadLeaderboard:', error);
         container.innerHTML = `<div class="no-data"><p>Error al cargar la tabla.</p></div>`;
     }
 }
+
+
+// === NUEVA FUNCIÓN: Aplicar colores por posición ===
+function applyPositionColors(position) {
+    const positionElement = document.getElementById('userPosition');
+    if (!positionElement) return;
+    
+    // Remover clases anteriores
+    positionElement.classList.remove('position-gold', 'position-silver', 'position-bronze', 'position-default');
+    
+    // Aplicar clase según la posición
+    switch(position) {
+        case 1:
+            positionElement.classList.add('position-gold');
+            break;
+        case 2:
+            positionElement.classList.add('position-silver');
+            break;
+        case 3:
+            positionElement.classList.add('position-bronze');
+            break;
+        default:
+            positionElement.classList.add('position-default');
+            break;
+    }
+}
+
+// === NUEVA FUNCIÓN: Obtener emoji de medalla ===
+function getMedalEmoji(position) {
+    switch(position) {
+        case 1: return '🥇';
+        case 2: return '🥈';
+        case 3: return '🥉';
+        default: return '';
+    }
+}
+
 
 // --- ¡NUEVAS FUNCIONES! ---
 
@@ -827,7 +890,7 @@ window.submitPrediction = async function(event, matchId) {
 
 window.showFullLeaderboard = async function() {
     const modal = document.createElement('div');
-    modal.className = 'leaderboard-modal'; // Usamos una clase específica para evitar conflictos
+    modal.className = 'leaderboard-modal';
     modal.innerHTML = `
         <div class="modal-content large">
             <div class="modal-header">
@@ -842,7 +905,6 @@ window.showFullLeaderboard = async function() {
     document.body.appendChild(modal);
 
     try {
-        // ✅ CORRECCIÓN: Llamamos a la nueva ruta /api/leaderboard/full
         const response = await fetchWithAuth('/api/leaderboard/full');
         if (!response || !response.ok) throw new Error('Error al cargar la tabla completa.');
 
@@ -867,14 +929,16 @@ window.showFullLeaderboard = async function() {
                 ${leaderboardData.map(user => {
                     const isCurrentUser = user.id == currentUserId;
                     const isTop3 = user.position <= 3;
+                    const medalEmoji = getMedalEmoji(user.position);
+                    
                     return `
                     <div class="leaderboard-row ${isCurrentUser ? 'current-user' : ''} ${isTop3 ? 'top-three' : ''}">
-                        <div class="pos">${user.position}</div>
+                        <div class="pos">${medalEmoji}#${user.position}</div>
                         <div class="name">${user.name} ${isCurrentUser ? '<span class="you-badge">TÚ</span>' : ''}</div>
                         <div class="predictions">${user.successful_predictions}/${user.total_predictions}</div>
                         <div class="points"><strong>${user.total_points}</strong></div>
                     </div>
-                    `
+                    `;
                 }).join('')}
             </div>
         `;
@@ -883,6 +947,7 @@ window.showFullLeaderboard = async function() {
         document.getElementById('fullLeaderboardContent').innerHTML = `<div class="no-data"><p>No se pudo cargar la tabla.</p></div>`;
     }
 }
+
 
 window.closeLeaderboardModal = function() {
     const modal = document.querySelector('.leaderboard-modal');

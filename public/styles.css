@@ -2629,3 +2629,82 @@ main {
         flex-wrap: wrap;
     }
 }
+
+/* ===== COLORES POR POSICIÓN ===== */
+.position-number.position-gold {
+    background: linear-gradient(135deg, #ffd700 0%, #ffed4a 100%);
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-shadow: 0 2px 4px rgba(255, 215, 0, 0.3);
+    filter: drop-shadow(0 2px 4px rgba(255, 215, 0, 0.3));
+    animation: goldGlow 2s ease-in-out infinite alternate;
+}
+
+.position-number.position-silver {
+    background: linear-gradient(135deg, #c0c0c0 0%, #e8e8e8 100%);
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-shadow: 0 2px 4px rgba(192, 192, 192, 0.3);
+    filter: drop-shadow(0 2px 4px rgba(192, 192, 192, 0.3));
+    animation: silverGlow 2s ease-in-out infinite alternate;
+}
+
+.position-number.position-bronze {
+    background: linear-gradient(135deg, #cd7f32 0%, #d2691e 100%);
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-shadow: 0 2px 4px rgba(205, 127, 50, 0.3);
+    filter: drop-shadow(0 2px 4px rgba(205, 127, 50, 0.3));
+    animation: bronzeGlow 2s ease-in-out infinite alternate;
+}
+
+.position-number.position-default {
+    color: #001450; /* Azul original */
+}
+
+/* Animaciones de brillo */
+@keyframes goldGlow {
+    0% { filter: drop-shadow(0 2px 4px rgba(255, 215, 0, 0.3)); }
+    100% { filter: drop-shadow(0 4px 8px rgba(255, 215, 0, 0.6)); }
+}
+
+@keyframes silverGlow {
+    0% { filter: drop-shadow(0 2px 4px rgba(192, 192, 192, 0.3)); }
+    100% { filter: drop-shadow(0 4px 8px rgba(192, 192, 192, 0.6)); }
+}
+
+@keyframes bronzeGlow {
+    0% { filter: drop-shadow(0 2px 4px rgba(205, 127, 50, 0.3)); }
+    100% { filter: drop-shadow(0 4px 8px rgba(205, 127, 50, 0.6)); }
+}
+
+/* Estilos para top 3 en leaderboard */
+.leaderboard-row.top-three {
+    background: linear-gradient(90deg, #fffbeb 0%, #fef3c7 100%);
+    border-left: 4px solid #f59e0b;
+}
+
+.leaderboard-row.top-three .pos {
+    font-weight: 700;
+    font-size: 1.1rem;
+}
+
+/* Efecto especial para el primer puesto */
+.leaderboard-row.top-three:first-of-type {
+    background: linear-gradient(90deg, #fef7cd 0%, #fde68a 100%);
+    border-left: 4px solid #d97706;
+    box-shadow: 0 2px 8px rgba(217, 119, 6, 0.2);
+}
+
+/* Responsive para dispositivos pequeños */
+@media (max-width: 600px) {
+    .position-number.position-gold,
+    .position-number.position-silver,
+    .position-number.position-bronze {
+        /* Desactivar animaciones en móviles para mejor rendimiento */
+        animation: none;
+    }
+}
