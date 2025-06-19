@@ -775,7 +775,7 @@ main {
 
 .leaderboard-header-row {
     display: grid;
-    grid-template-columns: 60px 1fr 100px 80px;
+    grid-template-columns: 70px 1fr 125px 80px;
     gap: 1rem;
     padding: 1rem;
     background: #001450;
@@ -783,11 +783,11 @@ main {
     font-weight: 600;
     font-size: 0.9rem;
 }
-
+/*
 .leaderboard-table.full .leaderboard-header-row {
     grid-template-columns: 80px 1fr 120px 90px 120px 80px;
 }
-
+*/
 .leaderboard-row {
     display: grid;
     grid-template-columns: 60px 1fr 100px 80px;
@@ -797,11 +797,11 @@ main {
     align-items: center;
     transition: all 0.2s ease;
 }
-
+/*
 .leaderboard-table.full .leaderboard-row {
     grid-template-columns: 80px 1fr 120px 90px 120px 80px;
 }
-
+*/
 .leaderboard-row:hover {
     background: #edf2f7;
 }
@@ -945,21 +945,30 @@ main {
 @media (max-width: 768px) {
     .leaderboard-header-row,
     .leaderboard-row {
-        grid-template-columns: 50px 1fr 70px 60px;
+        grid-template-columns: 45px 120px 55px;
         gap: 0.5rem;
         padding: 0.5rem;
-        font-size: 0.85rem;
+        font-size: 0.7rem;
     }
     
     .leaderboard-table.full .leaderboard-header-row,
     .leaderboard-table.full .leaderboard-row {
-        grid-template-columns: 1fr;
+        grid-template-columns: 35px 125px 45px 45px;
         gap: 0.25rem;
     }
     
     .leaderboard-table.full .leaderboard-row > div {
         padding: 0.25rem 0;
     }
+
+    .points strong {
+        font-size: 0.8rem;
+    }
+
+    .predictions {
+        font-size: 0.7rem;
+    }
+
 }
 
 /* Estilos para panel admin mejorado */
