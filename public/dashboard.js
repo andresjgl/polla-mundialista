@@ -150,8 +150,13 @@ async function loadLeaderboard() {
             container.innerHTML = `<div class="no-data"><p>Aún no hay participantes en el ranking.</p></div>`;
             return;
         }
-        const top5 = leaderboard.slice(0, 5);
-        container.innerHTML = `<div class="leaderboard-table">${top5.map(user => `
+        const top10 = leaderboard.slice(0, 10);
+        container.innerHTML = `<div class="leaderboard-header-row">
+                    <div class="pos">Posición</div>
+                    <div class="name">Participante</div>
+                    <div class="predictions">Aciertos</div>
+                    <div class="points">Puntos</div>
+                </div><div class="leaderboard-table">${top10.map(user => `
             <div class="leaderboard-row ${user.id == JSON.parse(localStorage.getItem('user')).id ? 'current-user' : ''}">
                 <div class="pos">#${user.position}</div>
                 <div class="name">${user.name}</div>
@@ -855,7 +860,7 @@ window.showFullLeaderboard = async function() {
         contentDiv.innerHTML = `
             <div class="leaderboard-table full">
                 <div class="leaderboard-header-row">
-                    <div class="pos">Pos.</div>
+                    <div class="pos">Posición</div>
                     <div class="name">Participante</div>
                     <div class="predictions">Aciertos</div>
                     <div class="points">Puntos</div>
