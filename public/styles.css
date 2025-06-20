@@ -768,12 +768,13 @@ main {
 
 .leaderboard-table {
     background: #f7fafc;
-    border-radius: 8px;
+    border-radius: 0px 0px 8px 8px;
     overflow: hidden;
     border: 1px solid #e2e8f0;
 }
 
 .leaderboard-header-row {
+    border-radius: 8px 8px 0px 0px;
     display: grid;
     grid-template-columns: 70px 1fr 125px 80px;
     gap: 1rem;
@@ -2632,53 +2633,59 @@ main {
 
 /* ===== COLORES POR POSICIÓN ===== */
 .position-number.position-gold {
-    background: linear-gradient(135deg, #ffd700 0%, #ffed4a 100%);
-    background-clip: text;
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    text-shadow: 0 2px 4px rgba(255, 215, 0, 0.3);
-    filter: drop-shadow(0 2px 4px rgba(255, 215, 0, 0.3));
+    color: #d4af37 !important; /* Dorado sólido */
+    text-shadow: 0 2px 4px rgba(212, 175, 55, 0.4);
     animation: goldGlow 2s ease-in-out infinite alternate;
 }
 
 .position-number.position-silver {
-    background: linear-gradient(135deg, #c0c0c0 0%, #e8e8e8 100%);
-    background-clip: text;
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    text-shadow: 0 2px 4px rgba(192, 192, 192, 0.3);
-    filter: drop-shadow(0 2px 4px rgba(192, 192, 192, 0.3));
+    color: #c0c0c0 !important; /* Plateado sólido */
+    text-shadow: 0 2px 4px rgba(192, 192, 192, 0.4);
     animation: silverGlow 2s ease-in-out infinite alternate;
 }
 
 .position-number.position-bronze {
-    background: linear-gradient(135deg, #cd7f32 0%, #d2691e 100%);
-    background-clip: text;
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    text-shadow: 0 2px 4px rgba(205, 127, 50, 0.3);
-    filter: drop-shadow(0 2px 4px rgba(205, 127, 50, 0.3));
+    color: #cd7f32 !important; /* Bronce sólido */
+    text-shadow: 0 2px 4px rgba(205, 127, 50, 0.4);
     animation: bronzeGlow 2s ease-in-out infinite alternate;
 }
 
 .position-number.position-default {
-    color: #001450; /* Azul original */
+    color: #001450 !important; /* Azul original */
 }
 
-/* Animaciones de brillo */
+/* Animaciones de brillo más compatibles */
 @keyframes goldGlow {
-    0% { filter: drop-shadow(0 2px 4px rgba(255, 215, 0, 0.3)); }
-    100% { filter: drop-shadow(0 4px 8px rgba(255, 215, 0, 0.6)); }
+    0% { 
+        text-shadow: 0 2px 4px rgba(212, 175, 55, 0.4);
+        transform: scale(1);
+    }
+    100% { 
+        text-shadow: 0 4px 8px rgba(212, 175, 55, 0.8);
+        transform: scale(1.05);
+    }
 }
 
 @keyframes silverGlow {
-    0% { filter: drop-shadow(0 2px 4px rgba(192, 192, 192, 0.3)); }
-    100% { filter: drop-shadow(0 4px 8px rgba(192, 192, 192, 0.6)); }
+    0% { 
+        text-shadow: 0 2px 4px rgba(192, 192, 192, 0.4);
+        transform: scale(1);
+    }
+    100% { 
+        text-shadow: 0 4px 8px rgba(192, 192, 192, 0.8);
+        transform: scale(1.05);
+    }
 }
 
 @keyframes bronzeGlow {
-    0% { filter: drop-shadow(0 2px 4px rgba(205, 127, 50, 0.3)); }
-    100% { filter: drop-shadow(0 4px 8px rgba(205, 127, 50, 0.6)); }
+    0% { 
+        text-shadow: 0 2px 4px rgba(205, 127, 50, 0.4);
+        transform: scale(1);
+    }
+    100% { 
+        text-shadow: 0 4px 8px rgba(205, 127, 50, 0.8);
+        transform: scale(1.05);
+    }
 }
 
 /* Estilos para top 3 en leaderboard */
@@ -2693,7 +2700,7 @@ main {
 }
 
 /* Efecto especial para el primer puesto */
-.leaderboard-row.top-three:first-of-type {
+.leaderboard-row.top-three:nth-child(2) { /* Segundo hijo porque el primero es el header */
     background: linear-gradient(90deg, #fef7cd 0%, #fde68a 100%);
     border-left: 4px solid #d97706;
     box-shadow: 0 2px 8px rgba(217, 119, 6, 0.2);

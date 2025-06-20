@@ -955,3 +955,33 @@ window.closeLeaderboardModal = function() {
         modal.remove();
     }
 }
+
+// === FUNCIÓN DE PRUEBA (ELIMINAR DESPUÉS) ===
+function testPositionColors() {
+    console.log('🧪 Probando colores de posición...');
+    
+    const positions = [1, 2, 3, 4];
+    const positionElement = document.getElementById('userPosition');
+    
+    if (!positionElement) {
+        console.error('❌ Elemento userPosition no encontrado');
+        return;
+    }
+    
+    positions.forEach((pos, index) => {
+        setTimeout(() => {
+            console.log(`🎯 Aplicando posición ${pos}`);
+            positionElement.textContent = `${getMedalEmoji(pos)}#${pos}`;
+            applyPositionColors(pos);
+            
+            // Verificar clases aplicadas
+            console.log('📝 Clases actuales:', positionElement.className);
+        }, index * 2000);
+    });
+}
+
+// Ejecutar prueba automáticamente después de 3 segundos
+setTimeout(() => {
+    console.log('🚀 Iniciando prueba de colores...');
+    testPositionColors();
+}, 3000);
