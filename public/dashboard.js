@@ -136,7 +136,7 @@ async function loadUserStats(userId) {
         document.getElementById('userPoints').textContent = stats.total_points || 0;
         
         // Actualizar posición con emoji y color
-        const position = stats.position || 0;
+        const position = parseInt(stats.position) || 0; // ← AÑADIR parseInt()
         const medalEmoji = getMedalEmoji(position);
         const positionText = position > 0 ? `${medalEmoji}#${position}` : '#-';
         
@@ -181,13 +181,14 @@ async function loadLeaderboard() {
             const isCurrentUser = user.id == JSON.parse(localStorage.getItem('user')).id;
             const positionClass = user.position <= 3 ? 'top-three' : '';
             
-            // ✨ CALCULAR EMOJI EXPLÍCITAMENTE
+            // ✨ CALCULAR EMOJI EXPLÍCITAMENTE - CONVERTIR A NÚMERO
             let medalEmoji = '';
-            if (user.position === 1) medalEmoji = '🥇';
-            else if (user.position === 2) medalEmoji = '🥈';
-            else if (user.position === 3) medalEmoji = '🥉';
-            
-            console.log(`🏆 Usuario ${user.name} - Posición: ${user.position} - Emoji: "${medalEmoji}"`);
+            const position = parseInt(user.position); // ← ESTA ES LA CLAVE
+            if (position === 1) medalEmoji = '🥇';
+            else if (position === 2) medalEmoji = '🥈';
+            else if (position === 3) medalEmoji = '🥉';
+
+            console.log(`🏆 Usuario ${user.name} - Posición: ${position} (tipo: ${typeof position}) - Emoji: "${medalEmoji}"`);
             
             tableHTML += `
                 <div class="leaderboard-row ${isCurrentUser ? 'current-user' : ''} ${positionClass}">
@@ -948,11 +949,12 @@ window.showFullLeaderboard = async function() {
             const isCurrentUser = user.id == currentUserId;
             const isTop3 = user.position <= 3;
             
-            // ✨ CALCULAR EMOJI EXPLÍCITAMENTE
+            // ✨ CALCULAR EMOJI EXPLÍCITAMENTE - CONVERTIR A NÚMERO
             let medalEmoji = '';
-            if (user.position === 1) medalEmoji = '🥇';
-            else if (user.position === 2) medalEmoji = '🥈';
-            else if (user.position === 3) medalEmoji = '🥉';
+            const position = parseInt(user.position); // ← AÑADIR ESTA LÍNEA
+            if (position === 1) medalEmoji = '🥇';
+            else if (position === 2) medalEmoji = '🥈';
+            else if (position === 3) medalEmoji = '🥉';
             
             tableHTML += `
                 <div class="leaderboard-row ${isCurrentUser ? 'current-user' : ''} ${isTop3 ? 'top-three' : ''}">
