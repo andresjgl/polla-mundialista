@@ -166,32 +166,48 @@ async function loadLeaderboard() {
             return;
         }
         const top10 = leaderboard.slice(0, 10);
-        container.innerHTML = `
+        
+        // ✨ NUEVA LÓGICA: Construir HTML paso a paso
+        let tableHTML = `
             <div class="leaderboard-header-row">
                 <div class="pos">Pos.</div>
                 <div class="name">Participante</div>
                 <div class="points">Puntos</div>
             </div>
-            <div class="leaderboard-table">
-                ${top10.map(user => {
-                    const isCurrentUser = user.id == JSON.parse(localStorage.getItem('user')).id;
-                    const medalEmoji = getMedalEmoji(user.position);
-                    const positionClass = user.position <= 3 ? 'top-three' : '';
-                    
-                    return `
-                    <div class="leaderboard-row ${isCurrentUser ? 'current-user' : ''} ${positionClass}">
-                        <div class="pos">${medalEmoji}#${user.position}</div>
-                        <div class="name">${user.name}</div>
-                        <div class="points"><strong>${user.total_points || 0}</strong> pts</div>
-                    </div>`;
-                }).join('')}
-            </div>
-        `;
+            <div class="leaderboard-table">`;
+        
+        // Procesar cada usuario individualmente
+        top10.forEach(user => {
+            const isCurrentUser = user.id == JSON.parse(localStorage.getItem('user')).id;
+            const positionClass = user.position <= 3 ? 'top-three' : '';
+            
+            // ✨ CALCULAR EMOJI EXPLÍCITAMENTE
+            let medalEmoji = '';
+            if (user.position === 1) medalEmoji = '🥇';
+            else if (user.position === 2) medalEmoji = '🥈';
+            else if (user.position === 3) medalEmoji = '🥉';
+            
+            console.log(`🏆 Usuario ${user.name} - Posición: ${user.position} - Emoji: "${medalEmoji}"`);
+            
+            tableHTML += `
+                <div class="leaderboard-row ${isCurrentUser ? 'current-user' : ''} ${positionClass}">
+                    <div class="pos">${medalEmoji} #${user.position}</div>
+                    <div class="name">${user.name}</div>
+                    <div class="points"><strong>${user.total_points || 0}</strong> pts</div>
+                </div>`;
+        });
+        
+        tableHTML += `</div>`;
+        container.innerHTML = tableHTML;
+        
+        console.log('✅ Tabla de liderazgo renderizada con emojis');
+        
     } catch (error) {
         console.error('Error en loadLeaderboard:', error);
         container.innerHTML = `<div class="no-data"><p>Error al cargar la tabla.</p></div>`;
     }
 }
+
 
 
 // === NUEVA FUNCIÓN: Aplicar colores por posición ===
@@ -918,35 +934,44 @@ window.showFullLeaderboard = async function() {
             return;
         }
 
-        contentDiv.innerHTML = `
+        // ✨ NUEVA LÓGICA: Construir HTML paso a paso
+        let tableHTML = `
             <div class="leaderboard-table full">
                 <div class="leaderboard-header-row">
                     <div class="pos">Pos.</div>
                     <div class="name">Participante</div>
                     <div class="predictions">Aciertos</div>
                     <div class="points">Puntos</div>
-                </div>
-                ${leaderboardData.map(user => {
-                    const isCurrentUser = user.id == currentUserId;
-                    const isTop3 = user.position <= 3;
-                    const medalEmoji = getMedalEmoji(user.position);
-                    
-                    return `
-                    <div class="leaderboard-row ${isCurrentUser ? 'current-user' : ''} ${isTop3 ? 'top-three' : ''}">
-                        <div class="pos">${medalEmoji}#${user.position}</div>
-                        <div class="name">${user.name} ${isCurrentUser ? '<span class="you-badge">TÚ</span>' : ''}</div>
-                        <div class="predictions">${user.successful_predictions}/${user.total_predictions}</div>
-                        <div class="points"><strong>${user.total_points}</strong></div>
-                    </div>
-                    `;
-                }).join('')}
-            </div>
-        `;
+                </div>`;
+        
+        leaderboardData.forEach(user => {
+            const isCurrentUser = user.id == currentUserId;
+            const isTop3 = user.position <= 3;
+            
+            // ✨ CALCULAR EMOJI EXPLÍCITAMENTE
+            let medalEmoji = '';
+            if (user.position === 1) medalEmoji = '🥇';
+            else if (user.position === 2) medalEmoji = '🥈';
+            else if (user.position === 3) medalEmoji = '🥉';
+            
+            tableHTML += `
+                <div class="leaderboard-row ${isCurrentUser ? 'current-user' : ''} ${isTop3 ? 'top-three' : ''}">
+                    <div class="pos">${medalEmoji} #${user.position}</div>
+                    <div class="name">${user.name} ${isCurrentUser ? '<span class="you-badge">TÚ</span>' : ''}</div>
+                    <div class="predictions">${user.successful_predictions}/${user.total_predictions}</div>
+                    <div class="points"><strong>${user.total_points}</strong></div>
+                </div>`;
+        });
+        
+        tableHTML += `</div>`;
+        contentDiv.innerHTML = tableHTML;
+        
     } catch (error) {
         console.error('Error en showFullLeaderboard:', error);
         document.getElementById('fullLeaderboardContent').innerHTML = `<div class="no-data"><p>No se pudo cargar la tabla.</p></div>`;
     }
 }
+
 
 
 window.closeLeaderboardModal = function() {
@@ -955,33 +980,3 @@ window.closeLeaderboardModal = function() {
         modal.remove();
     }
 }
-
-// === FUNCIÓN DE PRUEBA (ELIMINAR DESPUÉS) ===
-function testPositionColors() {
-    console.log('🧪 Probando colores de posición...');
-    
-    const positions = [1, 2, 3, 4];
-    const positionElement = document.getElementById('userPosition');
-    
-    if (!positionElement) {
-        console.error('❌ Elemento userPosition no encontrado');
-        return;
-    }
-    
-    positions.forEach((pos, index) => {
-        setTimeout(() => {
-            console.log(`🎯 Aplicando posición ${pos}`);
-            positionElement.textContent = `${getMedalEmoji(pos)}#${pos}`;
-            applyPositionColors(pos);
-            
-            // Verificar clases aplicadas
-            console.log('📝 Clases actuales:', positionElement.className);
-        }, index * 2000);
-    });
-}
-
-// Ejecutar prueba automáticamente después de 3 segundos
-setTimeout(() => {
-    console.log('🚀 Iniciando prueba de colores...');
-    testPositionColors();
-}, 3000);
