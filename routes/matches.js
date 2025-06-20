@@ -39,11 +39,14 @@ router.get('/upcoming', authenticateToken, async (req, res) => {
         }
 
         // Consulta principal con paginación
+        // Consulta principal con paginación - ✅ AÑADIR LOGOS
         const query = `
             SELECT 
                 m.id,
                 m.home_team,
                 m.away_team,
+                ht.logo_url as home_team_logo,
+                at.logo_url as away_team_logo,
                 m.match_date,
                 m.home_score,
                 m.away_score,
@@ -60,17 +63,22 @@ router.get('/upcoming', authenticateToken, async (req, res) => {
             FROM matches_new m
             LEFT JOIN tournament_phases tp ON m.phase_id = tp.id
             LEFT JOIN tournaments t ON m.tournament_id = t.id
+            LEFT JOIN teams ht ON m.home_team_id = ht.id
+            LEFT JOIN teams at ON m.away_team_id = at.id
             ${whereClause}
             ORDER BY m.match_date ASC
             LIMIT ${limit} OFFSET ${offset}
         `;
 
         // Consulta para contar total
+        // Consulta para contar total - ✅ AÑADIR JOINS PARA CONSISTENCIA
         const countQuery = `
             SELECT COUNT(*) as total
             FROM matches_new m
             LEFT JOIN tournament_phases tp ON m.phase_id = tp.id
             LEFT JOIN tournaments t ON m.tournament_id = t.id
+            LEFT JOIN teams ht ON m.home_team_id = ht.id
+            LEFT JOIN teams at ON m.away_team_id = at.id
             ${whereClause}
         `;
         

@@ -2555,7 +2555,7 @@ main {
 }
 
 .points-earned {
-    font-size: 1.25rem;
+    font-size: 0.85rem;
     font-weight: 700;
     padding: 0.5rem 1rem;
     border-radius: 8px;
@@ -2714,4 +2714,155 @@ main {
         /* Desactivar animaciones en móviles para mejor rendimiento */
         animation: none;
     }
+}
+
+
+/* ===== LOGOS DE EQUIPOS EN TARJETAS ===== */
+.teams {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin: 0.5rem 0;
+    padding: 0.5rem;
+    background: #f8fafc;
+    border-radius: 8px;
+}
+
+.team {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex: 1;
+    min-width: 0; /* Para truncar texto si es necesario */
+}
+
+.team-logo {
+    width: 32px;
+    height: 32px;
+    object-fit: contain;
+    border-radius: 6px;
+    border: 1px solid #e2e8f0;
+    background: white;
+    padding: 2px;
+    transition: all 0.2s ease;
+}
+
+.team-logo:hover {
+    transform: scale(1.1);
+    border-color: #667eea;
+}
+
+.team-logo-placeholder {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
+    border-radius: 6px;
+    font-size: 1.2rem;
+    border: 1px solid #e2e8f0;
+    color: #718096;
+}
+
+.team-name {
+    font-weight: 600;
+    color: #4a5568;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vs {
+    font-size: 0.9rem;
+    color: #718096;
+    font-weight: 500;
+    padding: 0.25rem 0.5rem;
+    background: white;
+    border-radius: 4px;
+    border: 1px solid #e2e8f0;
+}
+
+/* Estilos específicos para predicciones */
+.match-teams {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin: 0.5rem 0;
+    padding: 0.75rem;
+    background: #f8fafc;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+}
+
+.match-teams .team-logo {
+    width: 28px;
+    height: 28px;
+}
+
+.match-teams .team-logo-placeholder {
+    width: 28px;
+    height: 28px;
+    font-size: 1rem;
+}
+
+/* Responsive para móviles */
+@media (max-width: 600px) {
+    .teams, .match-teams {
+        flex-direction: column;
+        gap: 0.5rem;
+        text-align: center;
+    }
+    
+    .team {
+        justify-content: center;
+        flex-direction: row;
+        width: 100%;
+    }
+    
+    .vs {
+        order: 2;
+        align-self: center;
+    }
+    
+    .team-name {
+        text-align: center;
+    }
+}
+
+/* Animación para carga de logos */
+.team-logo {
+    opacity: 0;
+    animation: fadeInLogo 0.3s ease-in-out forwards;
+}
+
+@keyframes fadeInLogo {
+    from {
+        opacity: 0;
+        transform: scale(0.8);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* Mejoras visuales adicionales */
+.prediction-card.has-points .match-teams {
+    background: linear-gradient(135deg, #ecfdf5 0%, #f0fdf4 100%);
+    border-color: #a7f3d0;
+}
+
+.prediction-card.finished .match-teams {
+    background: linear-gradient(135deg, #fef3c7 0%, #fef9c3 100%);
+    border-color: #fcd34d;
+}
+
+.match-card:hover .teams {
+    background: linear-gradient(135deg, #edf2f7 0%, #e2e8f0 100%);
+    transform: translateY(-1px);
 }

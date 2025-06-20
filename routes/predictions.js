@@ -49,6 +49,7 @@ router.get('/user', authenticateToken, async (req, res) => {
         const totalPages = Math.ceil(total / limit);
 
         // Obtener predicciones paginadas
+        // Obtener predicciones paginadas - ✅ AÑADIR LOGOS
         const predictionsQuery = `
             SELECT 
                 p.id,
@@ -62,6 +63,8 @@ router.get('/user', authenticateToken, async (req, res) => {
                 p.score_points,
                 m.home_team,
                 m.away_team,
+                ht.logo_url as home_team_logo,
+                at.logo_url as away_team_logo,
                 m.match_date,
                 m.status,
                 m.home_score AS actual_home_score,
@@ -72,6 +75,8 @@ router.get('/user', authenticateToken, async (req, res) => {
             JOIN matches_new m ON p.match_id = m.id
             JOIN tournaments t ON m.tournament_id = t.id
             LEFT JOIN tournament_phases tp ON m.phase_id = tp.id
+            LEFT JOIN teams ht ON m.home_team_id = ht.id
+            LEFT JOIN teams at ON m.away_team_id = at.id
             WHERE ${whereClause}
             ORDER BY m.match_date ASC, p.created_at DESC
             LIMIT ? OFFSET ?

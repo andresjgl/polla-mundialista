@@ -370,40 +370,54 @@ async function displayUpcomingMatchesWithPagination(data) {
         `;
 
         const matchesHTML = matches.map(match => {
-            const prediction = predictionsMap.get(match.id);
-            const hasPrediction = !!prediction;
-            
-            return `
-                <div class="match-card" data-match-id="${match.id}">
-                    <div class="match-info">
-                        <div class="teams">
-                            <span class="team">${match.home_team}</span> 
-                            <span class="vs">vs</span> 
-                            <span class="team">${match.away_team}</span>
-                        </div>
-                        <div class="match-date">${formatFullDate(match.match_date)}</div>
-                        <div class="phase-info">
-                            <small>📋 ${match.phase_name} - ${match.tournament_name}</small>
-                        </div>
-                        ${hasPrediction ? `
-                            <div class="existing-prediction">
-                                <small>✅ Tu predicción: ${prediction.predicted_home_score} - ${prediction.predicted_away_score}</small>
-                            </div>
-                        ` : `
-                            <div class="no-prediction">
-                                <small>⏳ Sin predicción</small>
-                            </div>
-                        `}
+        const prediction = predictionsMap.get(match.id);
+        const hasPrediction = !!prediction;
+        
+        return `
+            <div class="match-card" data-match-id="${match.id}">
+                <div class="match-info">
+                    <div class="phase-info">
+                        <small>📋 ${match.phase_name} - ${match.tournament_name}</small>
                     </div>
-                    <div class="match-actions">
-                        <button class="btn ${hasPrediction ? 'btn-secondary' : 'btn-primary'} btn-small" 
-                                onclick="showPredictionForm('${match.id}', '${match.home_team}', '${match.away_team}', ${hasPrediction ? `'${prediction.predicted_home_score}', '${prediction.predicted_away_score}'` : 'null, null'})">
-                            ${hasPrediction ? 'Editar' : 'Predecir'}
-                        </button>
+                    <div class="match-date">${formatFullDate(match.match_date)}</div>
+                    <div class="teams">
+                        <div class="team">
+                            ${match.home_team_logo ? 
+                                `<img src="${match.home_team_logo}" alt="${match.home_team}" class="team-logo" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                <div class="team-logo-placeholder" style="display:none;">⚽</div>` 
+                                : '<div class="team-logo-placeholder">⚽</div>'
+                            }
+                            <span class="team-name">${match.home_team}</span>
+                        </div>
+                        <span class="vs">vs</span>
+                        <div class="team">
+                            ${match.away_team_logo ? 
+                                `<img src="${match.away_team_logo}" alt="${match.away_team}" class="team-logo" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                <div class="team-logo-placeholder" style="display:none;">⚽</div>` 
+                                : '<div class="team-logo-placeholder">⚽</div>'
+                            }
+                            <span class="team-name">${match.away_team}</span>
+                        </div>
                     </div>
+                    ${hasPrediction ? `
+                        <div class="existing-prediction">
+                            <small>✅ Tu pronóstico: ${prediction.predicted_home_score} - ${prediction.predicted_away_score}</small>
+                        </div>
+                    ` : `
+                        <div class="no-prediction">
+                            <small>⏳ Sin pronóstico</small>
+                        </div>
+                    `}
                 </div>
-            `;
-        }).join('');
+                <div class="match-actions">
+                    <button class="btn ${hasPrediction ? 'btn-secondary' : 'btn-primary'} btn-small" 
+                            onclick="showPredictionForm('${match.id}', '${match.home_team}', '${match.away_team}', ${hasPrediction ? `'${prediction.predicted_home_score}', '${prediction.predicted_away_score}'` : 'null, null'})">
+                        ${hasPrediction ? 'Editar' : 'Predecir'}
+                    </button>
+                </div>
+            </div>
+        `;
+    }).join('');
 
         const paginationHTML = createPaginationControls(pagination);
 
@@ -643,7 +657,7 @@ function displayUserPredictionsWithPagination(data) {
         </div>
     `;
 
-    const predictionsHTML = predictions.map(p => {
+        const predictionsHTML = predictions.map(p => {
         const isFinished = p.status === 'finished';
         const pointsEarned = p.points_earned || 0;
         const hasPoints = isFinished && pointsEarned > 0;
@@ -651,14 +665,30 @@ function displayUserPredictionsWithPagination(data) {
         return `
             <div class="prediction-card ${isFinished ? 'finished' : 'pending'} ${hasPoints ? 'has-points' : ''}">
                 <div class="prediction-match">
-                    <div class="match-teams">
-                        <strong>${p.home_team} vs ${p.away_team}</strong>
+                    <div class="phase-info">
+                        <small>📋 ${p.phase_name || 'Sin fase'} - ${p.tournament_name || 'Sin torneo'}</small>
                     </div>
                     <div class="match-date">
                         <small>${formatFullDate(p.match_date)}</small>
                     </div>
-                    <div class="phase-info">
-                        <small>📋 ${p.phase_name || 'Sin fase'} - ${p.tournament_name || 'Sin torneo'}</small>
+                    <div class="match-teams">
+                        <div class="team">
+                            ${p.home_team_logo ? 
+                                `<img src="${p.home_team_logo}" alt="${p.home_team}" class="team-logo" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                <div class="team-logo-placeholder" style="display:none;">⚽</div>` 
+                                : '<div class="team-logo-placeholder">⚽</div>'
+                            }
+                            <span class="team-name">${p.home_team}</span>
+                        </div>
+                        <span class="vs">vs</span>
+                        <div class="team">
+                            ${p.away_team_logo ? 
+                                `<img src="${p.away_team_logo}" alt="${p.away_team}" class="team-logo" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                <div class="team-logo-placeholder" style="display:none;">⚽</div>` 
+                                : '<div class="team-logo-placeholder">⚽</div>'
+                            }
+                            <span class="team-name">${p.away_team}</span>
+                        </div>
                     </div>
                 </div>
                 
