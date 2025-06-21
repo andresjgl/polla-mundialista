@@ -57,7 +57,7 @@ function showTab(tabName) {
             loadTournamentFilter();
             break;
         case 'users':
-            loadAllUsers();
+            loadUsers();
             break;
     }
 
@@ -2264,3 +2264,161 @@ function displayActiveTournament(tournament) {
     console.log('✅ Torneo activo mostrado con estadísticas correctas');
 }
 
+// ============= GESTIÓN DE USUARIOS =============
+
+// Función para cargar usuarios
+async function loadUsers() {
+    try {
+        const response = await fetchWithAuth('/api/admin/users');
+        
+        if (!response || !response.ok) throw new Error('Error cargando usuarios');
+        
+        const users = await response.json();
+        displayUsers(users);
+        
+    } catch (error) {
+        console.error('Error cargando usuarios:', error);
+        const container = document.getElementById('usersList'); // ✨ USAR TU ID EXISTENTE
+        if (container) {
+            container.innerHTML = `
+                <div class="error-state">
+                    <p>Error cargando usuarios</p>
+                </div>
+            `;
+        }
+    }
+}
+
+// Función para mostrar usuarios
+function displayUsers(users) {
+    const container = document.getElementById('usersList'); // ✨ USAR TU ID EXISTENTE
+    
+    if (!container) {
+        console.warn('⚠️ Container usersList no encontrado');
+        return;
+    }
+    
+    if (!users || users.length === 0) {
+        container.innerHTML = `
+            <div class="no-data">
+                <p>No hay usuarios registrados</p>
+            </div>
+        `;
+        return;
+    }
+
+    const usersHTML = users.map(user => `
+        <div class="user-card">
+            <div class="user-info">
+                <div class="user-name">
+                    ${user.name}
+                    ${user.must_change_password ? '<span class="temp-password-badge">🔐 Temporal</span>' : ''}
+                </div>
+                <div class="user-email">${user.email}</div>
+                <div class="user-status">
+                    <span class="status-badge ${user.is_active ? 'active' : 'inactive'}">
+                        ${user.is_active ? 'Activo' : 'Inactivo'}
+                    </span>
+                </div>
+            </div>
+            <div class="user-actions">
+                <button class="btn btn-warning btn-small" onclick="resetUserPassword(${user.id}, '${user.name}')">
+                    🔐 Resetear Contraseña
+                </button>
+            </div>
+        </div>
+    `).join('');
+
+    container.innerHTML = `
+        <div class="users-header">
+            <h3>👥 Gestión de Usuarios</h3>
+            <button class="btn btn-primary btn-small" onclick="loadUsers()">
+                🔄 Actualizar
+            </button>
+        </div>
+        <div class="users-list">
+            ${usersHTML}
+        </div>
+    `;
+}
+
+// Función para resetear contraseña
+async function resetUserPassword(userId, userName) {
+    if (!confirm(`¿Resetear la contraseña de ${userName}?\\n\\nSe generará una contraseña temporal.`)) {
+        return;
+    }
+
+    try {
+        const response = await fetchWithAuth(`/api/admin/users/${userId}/reset-password`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            showTemporaryPasswordModal(userName, result.temporary_password);
+            loadUsers();
+        } else {
+            alert('Error: ' + result.error);
+        }
+    } catch (error) {
+        console.error('Error reseteando contraseña:', error);
+        alert('Error de conexión');
+    }
+}
+
+// Modal para mostrar contraseña temporal
+function showTemporaryPasswordModal(userName, temporaryPassword) {
+    const modal = document.createElement('div');
+    modal.className = 'prediction-modal';
+    modal.innerHTML = `
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>🔐 Contraseña Temporal</h3>
+                <button class="close-modal" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p><strong>Usuario:</strong> ${userName}</p>
+                <div class="temp-password-display">
+                    <label>Nueva Contraseña:</label>
+                    <div class="password-box">
+                        <span class="password-text">${temporaryPassword}</span>
+                        <button class="btn btn-small btn-secondary" onclick="copyPassword('${temporaryPassword}')">
+                            📋 Copiar
+                        </button>
+                    </div>
+                </div>
+                <div class="instructions">
+                    <h4>📋 Instrucciones:</h4>
+                    <ol>
+                        <li>Comparte esta contraseña con ${userName}</li>
+                        <li>Al iniciar sesión se le pedirá cambiarla</li>
+                        <li>La contraseña temporal expirará después del cambio</li>
+                    </ol>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-primary" onclick="closeModal()">Entendido</button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+}
+
+// Función para copiar contraseña
+function copyPassword(password) {
+    navigator.clipboard.writeText(password).then(() => {
+        alert('✅ Contraseña copiada');
+    }).catch(err => {
+        // Fallback
+        const textArea = document.createElement('textarea');
+        textArea.value = password;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        alert('✅ Contraseña copiada');
+    });
+}

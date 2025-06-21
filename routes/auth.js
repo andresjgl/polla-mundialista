@@ -141,6 +141,24 @@ router.post('/login', async (req, res) => {
             { expiresIn: '7d' }
         );
 
+        // ✨ AÑADIR ESTA SECCIÓN AQUÍ - VERIFICAR CAMBIO DE CONTRASEÑA OBLIGATORIO
+        if (user.must_change_password) {
+            console.log(`⚠️ Usuario ${user.name} debe cambiar contraseña`);
+            
+            return res.json({
+                message: 'Contraseña temporal activa',
+                requires_password_change: true,
+                user: {
+                    id: user.id,
+                    name: user.name,
+                    email: user.email,
+                    is_admin: user.is_admin
+                },
+                token: token,
+                temporary_login: true
+            });
+        }
+
         res.json({
             message: 'Inicio de sesión exitoso',
             token,
@@ -446,6 +464,89 @@ router.get('/me', authenticateToken, (req, res) => {
         res.status(500).json({ error: 'Error interno del servidor' });
     }
 });
+
+// POST /api/auth/change-required-password - Cambiar contraseña obligatoria
+router.post('/change-required-password', authenticateToken, async (req, res) => {
+    try {
+        const { current_password, new_password } = req.body;
+        const userId = req.user.id;
+
+        if (!current_password || !new_password) {
+            return res.status(400).json({ 
+                error: 'Contraseña actual y nueva contraseña son requeridas' 
+            });
+        }
+
+        if (new_password.length < 6) {
+            return res.status(400).json({ 
+                error: 'La nueva contraseña debe tener al menos 6 caracteres' 
+            });
+        }
+
+        const { db } = require('../database');
+        const bcrypt = require('bcrypt');
+
+        // Obtener usuario actual
+        db.get('SELECT * FROM users WHERE id = ?', [userId], async (err, user) => {
+            if (err || !user) {
+                return res.status(404).json({ error: 'Usuario no encontrado' });
+            }
+
+            // Verificar contraseña actual (temporal)
+            const isCurrentPasswordValid = await bcrypt.compare(current_password, user.password);
+            
+            if (!isCurrentPasswordValid) {
+                return res.status(400).json({ error: 'Contraseña actual incorrecta' });
+            }
+
+            try {
+                // Hashear nueva contraseña
+                const hashedNewPassword = await bcrypt.hash(new_password, 10);
+                
+                // Actualizar contraseña y quitar flag de cambio obligatorio
+                const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL;
+                const query = `
+                    UPDATE users 
+                    SET password = ${isProduction ? '$1' : '?'}, 
+                        must_change_password = ${isProduction ? '$2' : '?'},
+                        updated_at = ${isProduction ? 'NOW()' : "datetime('now')"}
+                    WHERE id = ${isProduction ? '$3' : '?'}
+                `;
+                
+                const params = [hashedNewPassword, false, userId];
+                
+                db.run(query, params, function(updateErr) {
+                    if (updateErr) {
+                        console.error('❌ Error actualizando contraseña:', updateErr);
+                        return res.status(500).json({ error: 'Error actualizando contraseña' });
+                    }
+
+                    console.log(`✅ Usuario ${user.name} cambió contraseña exitosamente`);
+
+                    res.json({
+                        message: 'Contraseña actualizada exitosamente',
+                        user: {
+                            id: user.id,
+                            name: user.name,
+                            email: user.email,
+                            role: user.role
+                        },
+                        password_changed: true
+                    });
+                });
+                
+            } catch (hashError) {
+                console.error('❌ Error hasheando nueva contraseña:', hashError);
+                res.status(500).json({ error: 'Error procesando nueva contraseña' });
+            }
+        });
+
+    } catch (error) {
+        console.error('❌ Error cambiando contraseña:', error);
+        res.status(500).json({ error: 'Error interno del servidor' });
+    }
+});
+
 
 
 module.exports = {
