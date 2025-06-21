@@ -715,6 +715,14 @@ function displayUserPredictionsWithPagination(data) {
                         `}
                     </div>
                 </div>
+                
+                ${isFinished ? `
+                    <div class="prediction-actions">
+                        <button class="btn btn-secondary btn-small" onclick="showMatchPredictions('${p.match_id}')">
+                            👥 Ver Predicciones
+                        </button>
+                    </div>
+                ` : ''}
             </div>
         `;
     }).join('');
@@ -1001,6 +1009,141 @@ window.showFullLeaderboard = async function() {
     } catch (error) {
         console.error('Error en showFullLeaderboard:', error);
         document.getElementById('fullLeaderboardContent').innerHTML = `<div class="no-data"><p>No se pudo cargar la tabla.</p></div>`;
+    }
+}
+
+// === FUNCIONES PARA VER PREDICCIONES DE OTROS USUARIOS ===
+
+window.showMatchPredictions = async function(matchId) {
+    console.log(`🔍 Cargando predicciones del partido ${matchId}...`);
+    
+    const modal = document.createElement('div');
+    modal.className = 'predictions-modal';
+    modal.innerHTML = `
+        <div class="modal-content large">
+            <div class="modal-header">
+                <h3>👥 Predicciones del Partido</h3>
+                <button class="close-modal" onclick="closePredictionsModal()">&times;</button>
+            </div>
+            <div class="modal-body" id="matchPredictionsContent">
+                <div class="loading-state">
+                    <div class="loading-spinner"></div>
+                    <p>Cargando predicciones...</p>
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+
+    try {
+        const response = await fetchWithAuth(`/api/predictions/match/${matchId}`);
+        
+        if (!response || !response.ok) {
+            throw new Error('Error al cargar las predicciones');
+        }
+
+        const data = await response.json();
+        displayMatchPredictions(data);
+        
+    } catch (error) {
+        console.error('❌ Error cargando predicciones:', error);
+        document.getElementById('matchPredictionsContent').innerHTML = `
+            <div class="error-state">
+                <div class="error-icon">⚠️</div>
+                <p>Error cargando predicciones</p>
+                <small>${error.message}</small>
+            </div>
+        `;
+    }
+}
+
+function displayMatchPredictions(data) {
+    const { match, predictions, statistics, current_user_id } = data;
+    const contentDiv = document.getElementById('matchPredictionsContent');
+    
+    if (!predictions || predictions.length === 0) {
+        contentDiv.innerHTML = `
+            <div class="no-data">
+                <p>No hay predicciones para este partido</p>
+            </div>
+        `;
+        return;
+    }
+
+    contentDiv.innerHTML = `
+        <div class="match-info-header">
+            <div class="match-title">
+                <h4>${match.home_team} ${match.home_score} - ${match.away_score} ${match.away_team}</h4>
+                <small>${match.phase_name} - ${match.tournament_name}</small>
+            </div>
+            <div class="match-stats">
+                <div class="stat-item">
+                    <span class="stat-number">${statistics.total_predictions}</span>
+                    <span class="stat-label">Predicciones</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number">${statistics.exact_matches}</span>
+                    <span class="stat-label">Exactas</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number">${statistics.result_matches}</span>
+                    <span class="stat-label">Resultado</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number">${statistics.exact_percentage}%</span>
+                    <span class="stat-label">Precisión</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="predictions-table">
+            <div class="table-header">
+                <div class="col-position">#</div>
+                <div class="col-user">Participante</div>
+                <div class="col-prediction">Predicción</div>
+                <div class="col-accuracy">Resultado</div>
+                <div class="col-points">Puntos</div>
+            </div>
+            ${predictions.map((pred, index) => {
+                const isCurrentUser = pred.user_id == current_user_id;
+                const accuracyClass = pred.prediction_accuracy;
+                const accuracyText = {
+                    'exact': '🎯 Exacto',
+                    'result': '✅ Resultado',
+                    'miss': '❌ Falló'
+                }[pred.prediction_accuracy];
+                
+                return `
+                    <div class="table-row ${isCurrentUser ? 'current-user' : ''} accuracy-${accuracyClass}">
+                        <div class="col-position">
+                            ${pred.points_earned > 0 ? 
+                                `<span class="position-medal">${index + 1}</span>` : 
+                                `<span class="position-number">${index + 1}</span>`
+                            }
+                        </div>
+                        <div class="col-user">
+                            ${pred.user_name} ${isCurrentUser ? '<span class="you-badge">TÚ</span>' : ''}
+                        </div>
+                        <div class="col-prediction">
+                            <span class="prediction-text">${pred.predicted_home_score} - ${pred.predicted_away_score}</span>
+                        </div>
+                        <div class="col-accuracy">
+                            <span class="accuracy-badge accuracy-${accuracyClass}">${accuracyText}</span>
+                        </div>
+                        <div class="col-points">
+                            <span class="points-display ${pred.points_earned > 0 ? 'positive' : 'zero'}">${pred.points_earned}</span>
+                        </div>
+                    </div>
+                `;
+            }).join('')}
+        </div>
+    `;
+}
+
+window.closePredictionsModal = function() {
+    const modal = document.querySelector('.predictions-modal');
+    if (modal) {
+        modal.remove();
     }
 }
 

@@ -282,4 +282,116 @@ router.post('/', authenticateToken, async (req, res) => {
     }
 });
 
+// GET /api/predictions/match/:matchId - Ver predicciones de un partido específico
+router.get('/match/:matchId', authenticateToken, async (req, res) => {
+    try {
+        const { matchId } = req.params;
+        const currentUserId = req.user.id;
+
+        console.log(`🔍 Obteniendo predicciones del partido ${matchId} solicitadas por usuario ${currentUserId}`);
+
+        // Verificar que el partido existe y está finalizado
+        const matchQuery = `
+            SELECT m.*, t.name as tournament_name, tp.name as phase_name
+            FROM matches_new m
+            LEFT JOIN tournaments t ON m.tournament_id = t.id
+            LEFT JOIN tournament_phases tp ON m.phase_id = tp.id
+            WHERE m.id = ? AND m.status = 'finished'
+        `;
+
+        const match = await new Promise((resolve, reject) => {
+            db.get(matchQuery, [matchId], (err, result) => {
+                if (err) reject(err);
+                else resolve(result);
+            });
+        });
+
+        if (!match) {
+            return res.status(404).json({ 
+                error: 'Partido no encontrado o aún no finalizado',
+                message: 'Solo se pueden ver predicciones de partidos finalizados'
+            });
+        }
+
+        // Obtener todas las predicciones del partido con información de usuarios
+        const predictionsQuery = `
+            SELECT 
+                p.id,
+                p.predicted_home_score,
+                p.predicted_away_score,
+                p.predicted_winner,
+                p.points_earned,
+                p.result_points,
+                p.score_points,
+                u.name as user_name,
+                u.id as user_id,
+                CASE 
+                    WHEN p.predicted_home_score = m.home_score AND p.predicted_away_score = m.away_score THEN 'exact'
+                    WHEN p.predicted_winner = (
+                        CASE 
+                            WHEN m.home_score > m.away_score THEN 'home'
+                            WHEN m.away_score > m.home_score THEN 'away'
+                            ELSE 'draw'
+                        END
+                    ) THEN 'result'
+                    ELSE 'miss'
+                END as prediction_accuracy
+            FROM predictions_new p
+            JOIN users u ON p.user_id = u.id
+            JOIN matches_new m ON p.match_id = m.id
+            WHERE p.match_id = ? AND u.is_active = true
+            ORDER BY p.points_earned DESC, u.name ASC
+        `;
+
+        const predictions = await new Promise((resolve, reject) => {
+            db.all(predictionsQuery, [matchId], (err, results) => {
+                if (err) {
+                    console.error('❌ Error obteniendo predicciones:', err);
+                    reject(err);
+                } else {
+                    console.log(`✅ ${results?.length || 0} predicciones encontradas`);
+                    resolve(results || []);
+                }
+            });
+        });
+
+        // Calcular estadísticas del partido
+        const totalPredictions = predictions.length;
+        const exactMatches = predictions.filter(p => p.prediction_accuracy === 'exact').length;
+        const resultMatches = predictions.filter(p => p.prediction_accuracy === 'result').length;
+        const missMatches = predictions.filter(p => p.prediction_accuracy === 'miss').length;
+
+        res.json({
+            match: {
+                id: match.id,
+                home_team: match.home_team,
+                away_team: match.away_team,
+                home_score: match.home_score,
+                away_score: match.away_score,
+                match_date: match.match_date,
+                tournament_name: match.tournament_name,
+                phase_name: match.phase_name
+            },
+            predictions,
+            statistics: {
+                total_predictions: totalPredictions,
+                exact_matches: exactMatches,
+                result_matches: resultMatches,
+                misses: missMatches,
+                exact_percentage: totalPredictions > 0 ? Math.round((exactMatches / totalPredictions) * 100) : 0,
+                result_percentage: totalPredictions > 0 ? Math.round((resultMatches / totalPredictions) * 100) : 0
+            },
+            current_user_id: currentUserId
+        });
+
+    } catch (error) {
+        console.error('❌ Error obteniendo predicciones del partido:', error);
+        res.status(500).json({ 
+            error: 'Error interno del servidor',
+            details: error.message 
+        });
+    }
+});
+
+
 module.exports = router;
