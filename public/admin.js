@@ -25,7 +25,7 @@ let currentPage = 1;
 let totalPages = 1;
 let currentFilters = { tournament_id: '', status: 'all' };
 
-// Función para manejar errores 401 automáticamente
+// Función para manejar errores 401 automáticamente - VERSIÓN MEJORADA
 async function fetchWithAuth(url, options = {}) {
     const token = localStorage.getItem('token');
     
@@ -45,8 +45,14 @@ async function fetchWithAuth(url, options = {}) {
         if (response.status === 401) {
             console.log('🔐 Token expirado, redirigiendo a login...');
             localStorage.removeItem('token');
+            localStorage.removeItem('user'); // ✅ LIMPIAR TAMBIÉN DATOS DE USUARIO
             alert('Tu sesión ha expirado. Por favor, inicia sesión de nuevo.');
-            window.location.href = '/login.html';
+            
+            // ✅ PEQUEÑO DELAY ANTES DE REDIRIGIR
+            setTimeout(() => {
+                window.location.href = '/login.html';
+            }, 1000);
+            
             return null;
         }
         
@@ -56,6 +62,7 @@ async function fetchWithAuth(url, options = {}) {
         throw error;
     }
 }
+
 
 // ============= GESTIÓN DE TABS =============
 
@@ -2343,9 +2350,9 @@ function displayUsers(users) {
     `;
 }
 
-// Función para resetear contraseña - VERSIÓN MÁS ROBUSTA
+// Función para resetear contraseña - VERSIÓN CORREGIDA
 async function resetUserPassword(userId, userName) {
-    if (!confirm(`¿Resetear la contraseña de ${userName}?\n\nSe generará una contraseña temporal.`)) {
+    if (!confirm(`¿Resetear la contraseña de ${userName}?\\n\\nSe generará una contraseña temporal.`)) {
         return;
     }
 
@@ -2357,9 +2364,10 @@ async function resetUserPassword(userId, userName) {
             headers: { 'Content-Type': 'application/json' }
         });
 
+        // ✅ VERIFICACIÓN MEJORADA - Si fetchWithAuth retorna null (token expirado)
         if (!response) {
-            console.warn('⚠️ No se recibió respuesta del servidor');
-            alert('Error: No se pudo conectar al servidor');
+            console.warn('⚠️ Token expirado o sin respuesta del servidor');
+            // No mostrar alert adicional, fetchWithAuth ya maneja la redirección
             return;
         }
 
@@ -2370,16 +2378,17 @@ async function resetUserPassword(userId, userName) {
         if (response.ok) {
             console.log('✅ Reset exitoso:', result);
             showTemporaryPasswordModal(userName, result.temporary_password);
-            loadUsers(); // Recargar para ver el estado actualizado
+            await loadUsers(); // Recargar para ver el estado actualizado
         } else {
             console.error('❌ Error del servidor:', result);
             alert('Error: ' + (result.error || 'Error desconocido'));
         }
     } catch (error) {
         console.error('❌ Error general:', error);
-        alert('Error de conexión. Inténtalo de nuevo.\n\nDetalle: ' + error.message);
+        alert('Error de conexión. Inténtalo de nuevo.\\n\\nDetalle: ' + error.message);
     }
 }
+
 
 
 // Modal para mostrar contraseña temporal
