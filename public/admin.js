@@ -26,6 +26,7 @@ let totalPages = 1;
 let currentFilters = { tournament_id: '', status: 'all' };
 
 // Función para manejar errores 401 automáticamente - VERSIÓN CORREGIDA
+// Función para manejar errores 401 automáticamente - VERSIÓN FINAL CORREGIDA
 async function fetchWithAuth(url, options = {}) {
     const token = localStorage.getItem('token');
     
@@ -39,17 +40,18 @@ async function fetchWithAuth(url, options = {}) {
         return null;
     }
 
+    // ✅ CORRECCIÓN CRÍTICA: Poner Authorization DESPUÉS del spread
     const defaultOptions = {
+        ...options,
         headers: {
-            'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json',
-            ...options.headers
-        },
-        ...options
+            ...options.headers,          // ← Opciones del usuario primero
+            'Authorization': `Bearer ${token}` // ← Authorization AL FINAL (no se sobrescribe)
+        }
     };
 
     try {
-        console.log('🎫 Enviando token:', token.substring(0, 20) + '...'); // ✅ DEBUG
+        console.log('🎫 Enviando token:', token.substring(0, 20) + '...');
         
         const response = await fetch(url, defaultOptions);
         
@@ -73,6 +75,7 @@ async function fetchWithAuth(url, options = {}) {
         throw error;
     }
 }
+
 
 
 
