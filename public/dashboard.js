@@ -9,6 +9,8 @@ let currentPredictionsPage = 1;
 let currentPredictionsFilter = 'all';
 const predictionsPerPage = 10;
 
+let notificationsVisible = false;
+let unreadCount = 0;
 
 document.addEventListener('DOMContentLoaded', async () => {
     const token = localStorage.getItem('token');
@@ -38,9 +40,257 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
+    // ✨ INICIALIZAR NOTIFICACIONES
+    await loadNotifications();
+    startNotificationsPolling();
+
     loadUpcomingMatches(1, 'all');
 
 });
+
+// ===== SISTEMA DE NOTIFICACIONES =====
+
+// Cargar notificaciones al iniciar
+async function loadNotifications() {
+    try {
+        const response = await fetchWithAuth('/api/notifications?limit=10');
+        if (!response || !response.ok) return;
+        
+        const data = await response.json();
+        updateNotificationsBadge(data.unread_count);
+        
+        console.log(`🔔 ${data.unread_count} notificaciones no leídas`);
+        
+    } catch (error) {
+        console.error('❌ Error cargando notificaciones:', error);
+    }
+}
+
+// Actualizar badge de notificaciones
+function updateNotificationsBadge(count) {
+    unreadCount = count;
+    const badge = document.getElementById('notificationsBadge');
+    
+    if (count > 0) {
+        badge.textContent = count > 99 ? '99+' : count;
+        badge.style.display = 'block';
+        badge.style.animation = 'pulse 2s infinite';
+    } else {
+        badge.style.display = 'none';
+    }
+}
+
+// Toggle modal de notificaciones
+window.toggleNotifications = async function() {
+    if (notificationsVisible) {
+        closeNotifications();
+    } else {
+        await showNotifications();
+    }
+}
+
+// Mostrar modal de notificaciones
+async function showNotifications() {
+    const modal = document.createElement('div');
+    modal.className = 'notifications-modal';
+    modal.id = 'notificationsModal';
+    modal.innerHTML = `
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>🔔 Notificaciones</h3>
+                <div class="modal-actions">
+                    <button class="btn btn-small btn-secondary" onclick="markAllAsRead()">
+                        ✅ Marcar todas
+                    </button>
+                    <button class="close-modal" onclick="closeNotifications()">&times;</button>
+                </div>
+            </div>
+            <div class="modal-body" id="notificationsContent">
+                <div class="loading-state">
+                    <div class="loading-spinner"></div>
+                    <p>Cargando notificaciones...</p>
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+    notificationsVisible = true;
+
+    try {
+        const response = await fetchWithAuth('/api/notifications?limit=20');
+        if (!response || !response.ok) throw new Error('Error cargando notificaciones');
+        
+        const data = await response.json();
+        displayNotifications(data.notifications, data.unread_count);
+        
+    } catch (error) {
+        console.error('❌ Error:', error);
+        document.getElementById('notificationsContent').innerHTML = `
+            <div class="error-state">
+                <div class="error-icon">⚠️</div>
+                <p>Error cargando notificaciones</p>
+            </div>
+        `;
+    }
+}
+
+// Mostrar lista de notificaciones
+function displayNotifications(notifications, unreadCount) {
+    const contentDiv = document.getElementById('notificationsContent');
+    
+    if (!notifications || notifications.length === 0) {
+        contentDiv.innerHTML = `
+            <div class="no-notifications">
+                <div class="no-notifications-icon">🔕</div>
+                <p>No tienes notificaciones</p>
+                <small>Te avisaremos cuando haya novedades</small>
+            </div>
+        `;
+        return;
+    }
+
+    const notificationsHTML = notifications.map(notif => {
+        const isUnread = !notif.is_read;
+        const timeAgo = getTimeAgo(notif.created_at);
+        const icon = getNotificationIcon(notif.type);
+        
+        return `
+            <div class="notification-item ${isUnread ? 'unread' : 'read'}" data-id="${notif.id}">
+                <div class="notification-icon">${icon}</div>
+                <div class="notification-content">
+                    <div class="notification-title">${notif.title}</div>
+                    <div class="notification-message">${notif.message}</div>
+                    <div class="notification-time">${timeAgo}</div>
+                </div>
+                ${isUnread ? '<div class="unread-indicator"></div>' : ''}
+            </div>
+        `;
+    }).join('');
+
+    contentDiv.innerHTML = `
+        <div class="notifications-list">
+            ${notificationsHTML}
+        </div>
+    `;
+
+    // Marcar como leídas al hacer click
+    document.querySelectorAll('.notification-item.unread').forEach(item => {
+        item.addEventListener('click', () => markAsRead([item.dataset.id]));
+    });
+}
+
+// Obtener icono según tipo de notificación
+function getNotificationIcon(type) {
+    const icons = {
+        'match_starting': '⏰',
+        'result_updated': '📊',
+        'position_change': '📈',
+        'tournament_update': '🏆',
+        'system': '🔧'
+    };
+    return icons[type] || '🔔';
+}
+
+// Calcular tiempo transcurrido
+function getTimeAgo(dateString) {
+    const now = new Date();
+    const date = new Date(dateString);
+    const diffInMinutes = Math.floor((now - date) / (1000 * 60));
+    
+    if (diffInMinutes < 1) return 'Ahora mismo';
+    if (diffInMinutes < 60) return `${diffInMinutes}m`;
+    if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)}h`;
+    return `${Math.floor(diffInMinutes / 1440)}d`;
+}
+
+// Marcar notificaciones como leídas
+async function markAsRead(notificationIds) {
+    try {
+        const response = await fetchWithAuth('/api/notifications/mark-read', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ notification_ids: notificationIds })
+        });
+
+        if (response && response.ok) {
+            // Actualizar UI
+            notificationIds.forEach(id => {
+                const item = document.querySelector(`[data-id="${id}"]`);
+                if (item) {
+                    item.classList.remove('unread');
+                    item.classList.add('read');
+                    const indicator = item.querySelector('.unread-indicator');
+                    if (indicator) indicator.remove();
+                }
+            });
+            
+            // Actualizar contador
+            const newUnreadCount = Math.max(0, unreadCount - notificationIds.length);
+            updateNotificationsBadge(newUnreadCount);
+        }
+    } catch (error) {
+        console.error('❌ Error marcando como leída:', error);
+    }
+}
+
+// Marcar todas como leídas
+window.markAllAsRead = async function() {
+    try {
+        const response = await fetchWithAuth('/api/notifications/mark-all-read', {
+            method: 'POST'
+        });
+
+        if (response && response.ok) {
+            // Actualizar UI
+            document.querySelectorAll('.notification-item.unread').forEach(item => {
+                item.classList.remove('unread');
+                item.classList.add('read');
+                const indicator = item.querySelector('.unread-indicator');
+                if (indicator) indicator.remove();
+            });
+            
+            updateNotificationsBadge(0);
+            
+            // Mostrar mensaje de confirmación
+            showTemporaryMessage('✅ Todas las notificaciones marcadas como leídas');
+        }
+    } catch (error) {
+        console.error('❌ Error marcando todas como leídas:', error);
+    }
+}
+
+// Cerrar modal de notificaciones
+window.closeNotifications = function() {
+    const modal = document.getElementById('notificationsModal');
+    if (modal) {
+        modal.remove();
+        notificationsVisible = false;
+    }
+}
+
+// Mostrar mensaje temporal
+function showTemporaryMessage(message) {
+    const toast = document.createElement('div');
+    toast.className = 'toast-message';
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+        toast.classList.add('show');
+    }, 100);
+    
+    setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
+}
+
+// Verificar notificaciones periódicamente
+function startNotificationsPolling() {
+    // Verificar cada 2 minutos
+    setInterval(loadNotifications, 2 * 60 * 1000);
+}
+
 
 // --- FUNCIÓN DE UTILIDAD (¡AHORA DEFINIDA!) ---
 async function fetchWithAuth(url, options = {}) {
