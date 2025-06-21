@@ -278,6 +278,7 @@ router.post('/:matchId/result', authenticateToken, requireAdmin, async (req, res
                     // 🔔 ✨ FIN DE NOTIFICACIONES
 
                     // 📱 PUSH NOTIFICATIONS (NUEVAS)
+                    /*
                     try {
                         const { notifyMatchResultWithPush } = require('./notifications');
                         console.log(`📱 Enviando push notifications para partido ${matchId}`);
@@ -287,6 +288,7 @@ router.post('/:matchId/result', authenticateToken, requireAdmin, async (req, res
                     } catch (pushError) {
                         console.error('⚠️ Error iniciando push notifications:', pushError);
                     }
+                    */
                     
                     res.json({
                         message: 'Resultado actualizado exitosamente',

@@ -117,6 +117,7 @@ async function requestNotificationPermission() {
 }
 
 // Crear suscripción push
+// Modificar la función subscribeToPush() para manejar errores mejor
 async function subscribeToPush() {
     try {
         const registration = await navigator.serviceWorker.ready;
@@ -126,7 +127,6 @@ async function subscribeToPush() {
             return null;
         }
 
-        // Verificar si ya existe suscripción
         let subscription = await registration.pushManager.getSubscription();
         
         if (!subscription) {
@@ -141,18 +141,23 @@ async function subscribeToPush() {
         pushSubscription = subscription;
         console.log('📱 Suscripción push activa:', subscription);
 
-        // Enviar suscripción al servidor
-        await savePushSubscription(subscription);
+        // ✨ ENVIAR SUSCRIPCIÓN AL SERVIDOR CON MANEJO DE ERRORES
+        try {
+            await savePushSubscription(subscription);
+        } catch (saveError) {
+            console.warn('⚠️ Error guardando suscripción en servidor (continuando):', saveError);
+            // No bloquear si falla el guardado en servidor
+        }
         
         return subscription;
     } catch (error) {
         console.error('❌ Error creando suscripción push:', error);
-        showTemporaryMessage('❌ Error configurando notificaciones');
+        showTemporaryMessage('⚠️ Las notificaciones push no están disponibles temporalmente');
         return null;
     }
 }
 
-// Guardar suscripción en el servidor
+// Guardar suscripción con mejor manejo de errores
 async function savePushSubscription(subscription) {
     try {
         const response = await fetchWithAuth('/api/notifications/subscribe', {
@@ -167,13 +172,17 @@ async function savePushSubscription(subscription) {
 
         if (response && response.ok) {
             console.log('✅ Suscripción guardada en servidor');
+            showTemporaryMessage('✅ Notificaciones push configuradas (en desarrollo)');
         } else {
-            console.error('❌ Error guardando suscripción');
+            console.warn('⚠️ Error guardando suscripción');
+            showTemporaryMessage('⚠️ Notificaciones push temporalmente no disponibles');
         }
     } catch (error) {
         console.error('❌ Error enviando suscripción al servidor:', error);
+        throw error; // Re-lanzar para manejo en subscribeToPush
     }
 }
+
 
 // Convertir clave VAPID a formato correcto
 function urlBase64ToUint8Array(base64String) {
