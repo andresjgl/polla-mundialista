@@ -5,19 +5,6 @@ const { db } = require('../database');
 
 const router = express.Router();
 
-// ✨ MIDDLEWARE PARA VERIFICAR ADMIN (AÑADIR SI NO EXISTE)
-function requireAdmin(req, res, next) {
-    console.log('🔐 Verificando permisos de admin para usuario:', req.user?.id, 'is_admin:', req.user?.is_admin);
-    
-    if (!req.user || !req.user.is_admin) {
-        console.log('❌ Acceso denegado - Usuario no es admin');
-        return res.status(403).json({ error: 'Acceso denegado. Se requieren permisos de administrador.' });
-    }
-    
-    console.log('✅ Usuario admin verificado');
-    next();
-}
-
 
 // ============= GESTIÓN DE TORNEOS =============
 
@@ -1573,17 +1560,40 @@ function generateTemporaryPassword() {
 
 // ============= GESTIÓN DE CONTRASEÑAS =============
 
-// POST /api/admin/users/:id/reset-password - VERSIÓN SIMPLIFICADA PARA DEBUG
+// POST /api/admin/users/:id/reset-password - VERSIÓN SIMPLIFICADA
 router.post('/users/:id/reset-password', authenticateToken, requireAdmin, async (req, res) => {
     try {
         console.log('🔐 Reset password route hit - User ID:', req.params.id);
         console.log('🔐 Request user:', req.user?.id, 'is_admin:', req.user?.is_admin);
         
-        res.json({
-            message: 'Ruta funcionando correctamente',
-            user_id: req.params.id,
-            admin_user: req.user?.id,
-            temporary_password: 'TEST123' // Solo para testing
+        const { id } = req.params;
+        const { db } = require('../database');
+        const bcrypt = require('bcrypt');
+
+        // Generar contraseña temporal
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+        let temporaryPassword = '';
+        for (let i = 0; i < 8; i++) {
+            temporaryPassword += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        
+        // Hashear la nueva contraseña
+        const hashedPassword = await bcrypt.hash(temporaryPassword, 10);
+        
+        // Actualizar solo la contraseña (sin must_change_password por ahora)
+        db.run('UPDATE users SET password = $1 WHERE id = $2', [hashedPassword, parseInt(id)], function(err) {
+            if (err) {
+                console.error('❌ Error actualizando contraseña:', err);
+                return res.status(500).json({ error: 'Error actualizando contraseña' });
+            }
+
+            console.log(`✅ Contraseña reseteada para usuario ${id}`);
+
+            res.json({
+                message: 'Contraseña reseteada exitosamente',
+                user_id: id,
+                temporary_password: temporaryPassword
+            });
         });
         
     } catch (error) {
@@ -1591,6 +1601,7 @@ router.post('/users/:id/reset-password', authenticateToken, requireAdmin, async 
         res.status(500).json({ error: 'Error interno: ' + error.message });
     }
 });
+
 
 
 
