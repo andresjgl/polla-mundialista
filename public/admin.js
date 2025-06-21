@@ -25,10 +25,20 @@ let currentPage = 1;
 let totalPages = 1;
 let currentFilters = { tournament_id: '', status: 'all' };
 
-// Función para manejar errores 401 automáticamente - VERSIÓN MEJORADA
+// Función para manejar errores 401 automáticamente - VERSIÓN CORREGIDA
 async function fetchWithAuth(url, options = {}) {
     const token = localStorage.getItem('token');
     
+    // ✅ VERIFICAR TOKEN ANTES DE ENVIARLO
+    if (!token || token === 'null' || token === 'undefined') {
+        console.warn('🔐 No hay token válido disponible');
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        alert('Tu sesión ha expirado. Por favor, inicia sesión de nuevo.');
+        window.location.href = '/login.html';
+        return null;
+    }
+
     const defaultOptions = {
         headers: {
             'Authorization': `Bearer ${token}`,
@@ -39,16 +49,17 @@ async function fetchWithAuth(url, options = {}) {
     };
 
     try {
+        console.log('🎫 Enviando token:', token.substring(0, 20) + '...'); // ✅ DEBUG
+        
         const response = await fetch(url, defaultOptions);
         
         // Si token expiró, redirigir a login
         if (response.status === 401) {
             console.log('🔐 Token expirado, redirigiendo a login...');
             localStorage.removeItem('token');
-            localStorage.removeItem('user'); // ✅ LIMPIAR TAMBIÉN DATOS DE USUARIO
+            localStorage.removeItem('user');
             alert('Tu sesión ha expirado. Por favor, inicia sesión de nuevo.');
             
-            // ✅ PEQUEÑO DELAY ANTES DE REDIRIGIR
             setTimeout(() => {
                 window.location.href = '/login.html';
             }, 1000);
@@ -62,6 +73,7 @@ async function fetchWithAuth(url, options = {}) {
         throw error;
     }
 }
+
 
 
 // ============= GESTIÓN DE TABS =============
