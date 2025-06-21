@@ -25,6 +25,38 @@ let currentPage = 1;
 let totalPages = 1;
 let currentFilters = { tournament_id: '', status: 'all' };
 
+// Función para manejar errores 401 automáticamente
+async function fetchWithAuth(url, options = {}) {
+    const token = localStorage.getItem('token');
+    
+    const defaultOptions = {
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            ...options.headers
+        },
+        ...options
+    };
+
+    try {
+        const response = await fetch(url, defaultOptions);
+        
+        // Si token expiró, redirigir a login
+        if (response.status === 401) {
+            console.log('🔐 Token expirado, redirigiendo a login...');
+            localStorage.removeItem('token');
+            alert('Tu sesión ha expirado. Por favor, inicia sesión de nuevo.');
+            window.location.href = '/login.html';
+            return null;
+        }
+        
+        return response;
+    } catch (error) {
+        console.error('Error en fetchWithAuth:', error);
+        throw error;
+    }
+}
+
 // ============= GESTIÓN DE TABS =============
 
 function showTab(tabName) {
@@ -60,39 +92,8 @@ function showTab(tabName) {
             loadUsers();
             break;
     }
+}
 
-
-// Función para manejar errores 401 automáticamente
-async function fetchWithAuth(url, options = {}) {
-    const token = localStorage.getItem('token');
-    
-    const defaultOptions = {
-        headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-            ...options.headers
-        },
-        ...options
-    };
-
-    try {
-        const response = await fetch(url, defaultOptions);
-        
-        // Si token expiró, redirigir a login
-        if (response.status === 401) {
-            console.log('🔐 Token expirado, redirigiendo a login...');
-            localStorage.removeItem('token');
-            alert('Tu sesión ha expirado. Por favor, inicia sesión de nuevo.');
-            window.location.href = '/login.html';
-            return null;
-        }
-        
-        return response;
-    } catch (error) {
-        console.error('Error en fetchWithAuth:', error);
-        throw error;
-    }
-}}
 
 // ============= FUNCIONES EXISTENTES (Stats y Users) =============
 
