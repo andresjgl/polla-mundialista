@@ -5,15 +5,17 @@ const { userOperations } = require('../database');
 
 const router = express.Router();
 
-// Clave secreta para JWT (en producción usar variable de entorno)
-const JWT_SECRET = 'tu-clave-super-secreta-cambiala-en-produccion';
+// Clave secreta para JWT - USAR VARIABLE DE ENTORNO CORRECTAMENTE
+const JWT_SECRET = process.env.JWT_SECRET || 'tu-clave-super-secreta-cambiala-en-produccion';
 
-// ✅ DEBUGGING DE LA CONFIGURACIÓN
+// ✅ DEBUGGING DE LA CONFIGURACIÓN - VERSIÓN MEJORADA
 console.log('🚀 === CONFIGURACIÓN AUTH ===');
 console.log('🔑 JWT_SECRET configurado:', JWT_SECRET ? 'SÍ' : 'NO');
+console.log('🔑 Usando variable de entorno:', process.env.JWT_SECRET ? 'SÍ' : 'NO (fallback)');
 console.log('🔑 JWT_SECRET primeros 10 chars:', JWT_SECRET ? JWT_SECRET.substring(0, 10) : 'N/A');
 console.log('🌍 NODE_ENV:', process.env.NODE_ENV || 'development');
 console.log('🌍 Variables de entorno cargadas:', Object.keys(process.env).length);
+
 
 // Middleware para verificar token - VERSIÓN DEBUGGING
 const authenticateToken = (req, res, next) => {
@@ -58,18 +60,29 @@ const authenticateToken = (req, res, next) => {
 };
 
 
-// Middleware para verificar admin
+// Middleware para verificar admin - VERSIÓN SERVERLESS OPTIMIZADA
 const requireAdmin = async (req, res, next) => {
     try {
-        const user = await userOperations.findById(req.user.id);
-        if (!user || !user.is_admin) {
+        console.log('🔐 === VERIFICANDO PERMISOS ADMIN ===');
+        console.log('👤 Usuario:', req.user.name, 'Admin desde JWT:', req.user.is_admin);
+        
+        // ✅ CONFIAR EN EL JWT (evitar consultas a BD innecesarias)
+        if (!req.user.is_admin) {
+            console.log('❌ Usuario no es admin según JWT');
             return res.status(403).json({ error: 'Permisos de administrador requeridos' });
         }
+        
+        console.log('✅ Usuario confirmado como admin desde JWT');
         next();
+        
     } catch (error) {
-        res.status(500).json({ error: 'Error verificando permisos' });
+        console.error('❌ Error verificando permisos admin:', error.message);
+        res.status(500).json({ 
+            error: 'Error verificando permisos: ' + error.message 
+        });
     }
 };
+
 
 // POST /api/auth/register - Registro de usuarios
 router.post('/register', async (req, res) => {
