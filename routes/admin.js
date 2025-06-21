@@ -1560,7 +1560,7 @@ function generateTemporaryPassword() {
 
 // ============= GESTIÓN DE CONTRASEÑAS =============
 
-// POST /api/admin/users/:id/reset-password - Resetear contraseña de usuario
+// POST /api/admin/users/:id/reset-password - VERSIÓN CORREGIDA PARA POSTGRESQL
 router.post('/users/:id/reset-password', authenticateToken, requireAdmin, async (req, res) => {
     try {
         const { id } = req.params;
@@ -1591,29 +1591,30 @@ router.post('/users/:id/reset-password', authenticateToken, requireAdmin, async 
                 // Hashear la nueva contraseña
                 const hashedPassword = await bcrypt.hash(temporaryPassword, 10);
                 
-                // Actualizar en base de datos
-                const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL;
+                // ✅ CONSULTA FIJA PARA POSTGRESQL (SIN INTERPOLACIÓN CONDICIONAL)
                 const query = `
                     UPDATE users 
-                    SET password = ${isProduction ? '$1' : '?'}, 
-                        must_change_password = ${isProduction ? '$2' : '?'},
-                        updated_at = ${isProduction ? 'NOW()' : "datetime('now')"}
-                    WHERE id = ${isProduction ? '$3' : '?'}
+                    SET password = $1, 
+                        must_change_password = $2,
+                        updated_at = NOW()
+                    WHERE id = $3
                 `;
                 
-                const params = [hashedPassword, true, id];
+                const params = [hashedPassword, true, parseInt(id)];
+                
+                console.log('🔧 Ejecutando query de reset con parámetros:', [hashedPassword.substring(0, 10) + '...', true, parseInt(id)]);
                 
                 db.run(query, params, function(updateErr) {
                     if (updateErr) {
                         console.error('❌ Error actualizando contraseña:', updateErr);
-                        return res.status(500).json({ error: 'Error actualizando contraseña' });
+                        return res.status(500).json({ error: 'Error actualizando contraseña: ' + updateErr.message });
                     }
 
                     if (this.changes === 0) {
                         return res.status(404).json({ error: 'Usuario no encontrado' });
                     }
 
-                    console.log(`✅ Contraseña reseteada para ${user.name}`);
+                    console.log(`✅ Contraseña reseteada para ${user.name} - Cambios: ${this.changes}`);
 
                     res.json({
                         message: 'Contraseña reseteada exitosamente',
@@ -1622,21 +1623,23 @@ router.post('/users/:id/reset-password', authenticateToken, requireAdmin, async 
                             name: user.name,
                             email: user.email
                         },
-                        temporary_password: temporaryPassword
+                        temporary_password: temporaryPassword,
+                        must_change_password: true
                     });
                 });
                 
             } catch (hashError) {
                 console.error('❌ Error hasheando contraseña:', hashError);
-                res.status(500).json({ error: 'Error procesando contraseña' });
+                res.status(500).json({ error: 'Error procesando contraseña: ' + hashError.message });
             }
         });
 
     } catch (error) {
         console.error('❌ Error reseteando contraseña:', error);
-        res.status(500).json({ error: 'Error interno del servidor' });
+        res.status(500).json({ error: 'Error interno del servidor: ' + error.message });
     }
 });
+
 
 // GET /api/admin/users - Listar usuarios (VERSIÓN FINAL CORREGIDA)
 router.get('/users', authenticateToken, requireAdmin, async (req, res) => {

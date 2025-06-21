@@ -2343,31 +2343,44 @@ function displayUsers(users) {
     `;
 }
 
-// Función para resetear contraseña
+// Función para resetear contraseña - VERSIÓN MÁS ROBUSTA
 async function resetUserPassword(userId, userName) {
-    if (!confirm(`¿Resetear la contraseña de ${userName}?\\n\\nSe generará una contraseña temporal.`)) {
+    if (!confirm(`¿Resetear la contraseña de ${userName}?\n\nSe generará una contraseña temporal.`)) {
         return;
     }
 
     try {
+        console.log(`🔐 Iniciando reset para usuario ${userId}`);
+        
         const response = await fetchWithAuth(`/api/admin/users/${userId}/reset-password`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' }
         });
 
+        if (!response) {
+            console.warn('⚠️ No se recibió respuesta del servidor');
+            alert('Error: No se pudo conectar al servidor');
+            return;
+        }
+
+        console.log('📡 Respuesta recibida, status:', response.status);
+
         const result = await response.json();
 
         if (response.ok) {
+            console.log('✅ Reset exitoso:', result);
             showTemporaryPasswordModal(userName, result.temporary_password);
-            loadUsers();
+            loadUsers(); // Recargar para ver el estado actualizado
         } else {
-            alert('Error: ' + result.error);
+            console.error('❌ Error del servidor:', result);
+            alert('Error: ' + (result.error || 'Error desconocido'));
         }
     } catch (error) {
-        console.error('Error reseteando contraseña:', error);
-        alert('Error de conexión');
+        console.error('❌ Error general:', error);
+        alert('Error de conexión. Inténtalo de nuevo.\n\nDetalle: ' + error.message);
     }
 }
+
 
 // Modal para mostrar contraseña temporal
 function showTemporaryPasswordModal(userName, temporaryPassword) {
