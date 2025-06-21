@@ -543,7 +543,7 @@ router.post('/change-required-password', authenticateToken, async (req, res) => 
         }
 
         const { db } = require('../database');
-        const bcrypt = require('bcrypt');
+        const bcrypt = require('bcryptjs');
 
         // Obtener usuario actual
         db.get('SELECT * FROM users WHERE id = ?', [userId], async (err, user) => {

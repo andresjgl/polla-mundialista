@@ -1568,7 +1568,7 @@ router.post('/users/:id/reset-password', authenticateToken, requireAdmin, async 
         
         const { id } = req.params;
         const { db } = require('../database');
-        const bcrypt = require('bcrypt');
+        const bcrypt = require('bcryptjs');
 
         // Generar contraseña temporal
         const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
