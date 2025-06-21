@@ -123,6 +123,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     // Guardar token y datos del usuario
                     localStorage.setItem('token', data.token);
                     localStorage.setItem('user', JSON.stringify(data.user));
+
+                    // ✅ VERIFICAR SI REQUIERE CAMBIO DE CONTRASEÑA
+                if (data.requires_password_change || data.temporary_login) {
+                    showMessage('Contraseña temporal detectada. Debes cambiar tu contraseña.', 'warning');
+                    
+                    setTimeout(() => {
+                        window.location.href = '/change-password.html';
+                    }, 2000);
+                    return;
+                }
                     
                     showMessage('¡Inicio de sesión exitoso!', 'success');
                     

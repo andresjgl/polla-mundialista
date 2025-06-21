@@ -30,6 +30,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
     }
 
+    // ✅ VERIFICAR SI DEBE CAMBIAR CONTRASEÑA
+    if (user.must_change_password) {
+        console.log('⚠️ Usuario debe cambiar contraseña, redirigiendo...');
+        window.location.href = '/change-password.html';
+        return;
+    }
+
     document.getElementById('userName').textContent = user.name || 'Usuario';
     
     checkAccountStatus(user);
