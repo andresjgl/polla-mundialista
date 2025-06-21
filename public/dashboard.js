@@ -12,6 +12,9 @@ const predictionsPerPage = 10;
 let notificationsVisible = false;
 let unreadCount = 0;
 
+let pushSubscription = null;
+const applicationServerKey = 'BNASXfnwv9-1BkWn9SrnrYIUM2uWRsab8of7a6ZaMojrWKirx8UNqOsSITCDsyv3d9jR_EXc4R2LzxGKZEgKEA0'; // Lo configuraremos después
+
 document.addEventListener('DOMContentLoaded', async () => {
     const token = localStorage.getItem('token');
     const user = JSON.parse(localStorage.getItem('user') || '{}');
@@ -28,6 +31,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('userName').textContent = user.name || 'Usuario';
     
     checkAccountStatus(user);
+
+     // ✨ INICIALIZAR PUSH NOTIFICATIONS
+    await registerServiceWorker();
 
     // Solo si la cuenta está activa, cargamos el resto.
     if (user.is_active) {
@@ -47,6 +53,157 @@ document.addEventListener('DOMContentLoaded', async () => {
     loadUpcomingMatches(1, 'all');
 
 });
+
+// ===== SISTEMA DE PUSH NOTIFICATIONS =====
+
+
+
+// Registrar Service Worker
+async function registerServiceWorker() {
+    if ('serviceWorker' in navigator) {
+        try {
+            const registration = await navigator.serviceWorker.register('/sw.js');
+            console.log('✅ Service Worker registrado:', registration);
+            
+            // Verificar si ya hay una suscripción
+            const existingSubscription = await registration.pushManager.getSubscription();
+            if (existingSubscription) {
+                pushSubscription = existingSubscription;
+                console.log('📱 Suscripción push existente encontrada');
+            }
+            
+            return registration;
+        } catch (error) {
+            console.error('❌ Error registrando Service Worker:', error);
+        }
+    } else {
+        console.warn('⚠️ Service Workers no soportados');
+    }
+}
+
+// Pedir permisos y crear suscripción push
+async function requestNotificationPermission() {
+    if (!('Notification' in window)) {
+        console.warn('⚠️ Este navegador no soporta notificaciones');
+        showTemporaryMessage('❌ Tu navegador no soporta notificaciones');
+        return false;
+    }
+
+    if (Notification.permission === 'granted') {
+        console.log('✅ Permisos de notificación ya concedidos');
+        await subscribeToPush();
+        return true;
+    }
+
+    if (Notification.permission === 'denied') {
+        console.warn('❌ Permisos de notificación denegados');
+        showTemporaryMessage('❌ Permisos de notificación denegados. Actívalos en configuración del navegador.');
+        return false;
+    }
+
+    // Pedir permisos
+    const permission = await Notification.requestPermission();
+    
+    if (permission === 'granted') {
+        console.log('✅ Permisos de notificación concedidos');
+        showTemporaryMessage('✅ ¡Notificaciones activadas! Recibirás alertas de partidos y resultados.');
+        await subscribeToPush();
+        return true;
+    } else {
+        console.warn('❌ Permisos de notificación denegados por el usuario');
+        showTemporaryMessage('❌ Sin permisos no podemos enviarte notificaciones automáticas');
+        return false;
+    }
+}
+
+// Crear suscripción push
+async function subscribeToPush() {
+    try {
+        const registration = await navigator.serviceWorker.ready;
+        
+        if (!registration.pushManager) {
+            console.warn('⚠️ Push Manager no disponible');
+            return null;
+        }
+
+        // Verificar si ya existe suscripción
+        let subscription = await registration.pushManager.getSubscription();
+        
+        if (!subscription) {
+            console.log('📱 Creando nueva suscripción push...');
+            
+            subscription = await registration.pushManager.subscribe({
+                userVisibleOnly: true,
+                applicationServerKey: urlBase64ToUint8Array(applicationServerKey)
+            });
+        }
+
+        pushSubscription = subscription;
+        console.log('📱 Suscripción push activa:', subscription);
+
+        // Enviar suscripción al servidor
+        await savePushSubscription(subscription);
+        
+        return subscription;
+    } catch (error) {
+        console.error('❌ Error creando suscripción push:', error);
+        showTemporaryMessage('❌ Error configurando notificaciones');
+        return null;
+    }
+}
+
+// Guardar suscripción en el servidor
+async function savePushSubscription(subscription) {
+    try {
+        const response = await fetchWithAuth('/api/notifications/subscribe', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                subscription: subscription.toJSON(),
+                user_agent: navigator.userAgent,
+                device_type: /Mobile|Android|iPhone|iPad/.test(navigator.userAgent) ? 'mobile' : 'desktop'
+            })
+        });
+
+        if (response && response.ok) {
+            console.log('✅ Suscripción guardada en servidor');
+        } else {
+            console.error('❌ Error guardando suscripción');
+        }
+    } catch (error) {
+        console.error('❌ Error enviando suscripción al servidor:', error);
+    }
+}
+
+// Convertir clave VAPID a formato correcto
+function urlBase64ToUint8Array(base64String) {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding)
+        .replace(/-/g, '+')
+        .replace(/_/g, '/');
+
+    const rawData = window.atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+
+    for (let i = 0; i < rawData.length; ++i) {
+        outputArray[i] = rawData.charCodeAt(i);
+    }
+    return outputArray;
+}
+
+// Testear notificación local
+async function testLocalNotification() {
+    if (Notification.permission === 'granted') {
+        new Notification('🏆 Test - Quiniela Familiar', {
+            body: 'Las notificaciones están funcionando correctamente',
+            icon: '/favicon.ico',
+            vibrate: [200, 100, 200]
+        });
+    } else {
+        await requestNotificationPermission();
+    }
+}
+
 
 // ===== SISTEMA DE NOTIFICACIONES =====
 
@@ -173,11 +330,46 @@ function displayNotifications(notifications, unreadCount) {
         </div>
     `;
 
-    // Marcar como leídas al hacer click
-    document.querySelectorAll('.notification-item.unread').forEach(item => {
-        item.addEventListener('click', () => markAsRead([item.dataset.id]));
-    });
 }
+
+// Marcar una notificación individual como leída - MÁS SEGURA
+window.markSingleAsRead = async function(notificationId) {
+    try {
+        console.log('🔄 Marcando notificación como leída:', notificationId);
+        
+        const response = await fetchWithAuth('/api/notifications/mark-read', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ notification_ids: [notificationId] })
+        });
+
+        if (response && response.ok) {
+            // Actualizar UI inmediatamente
+            const item = document.querySelector(`[data-id="${notificationId}"]`);
+            if (item) {
+                item.classList.remove('unread');
+                item.classList.add('read');
+                const indicator = item.querySelector('.unread-indicator');
+                const actions = item.querySelector('.notification-actions');
+                if (indicator) indicator.remove();
+                if (actions) actions.remove();
+            }
+            
+            // Actualizar contador
+            const newUnreadCount = Math.max(0, unreadCount - 1);
+            updateNotificationsBadge(newUnreadCount);
+            
+            console.log('✅ Notificación marcada como leída');
+        } else {
+            console.warn('⚠️ Error marcando notificación, pero no redirigiendo');
+        }
+    } catch (error) {
+        console.error('❌ Error marcando como leída:', error);
+        // NO redirigir al login, solo mostrar un mensaje discreto
+        showTemporaryMessage('⚠️ Error al marcar notificación');
+    }
+}
+
 
 // Obtener icono según tipo de notificación
 function getNotificationIcon(type) {
@@ -293,23 +485,46 @@ function startNotificationsPolling() {
 
 
 // --- FUNCIÓN DE UTILIDAD (¡AHORA DEFINIDA!) ---
+// Función fetchWithAuth mejorada - MENOS AGRESIVA
 async function fetchWithAuth(url, options = {}) {
     const token = localStorage.getItem('token');
-    const defaultOptions = {
+    
+    if (!token) {
+        console.warn('⚠️ No hay token, pero no redirigiendo automáticamente');
+        return null; // En lugar de redirigir inmediatamente
+    }
+
+    const config = {
+        ...options,
         headers: {
             'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
             ...options.headers
-        },
-        ...options
+        }
     };
-    const response = await fetch(url, defaultOptions);
-    if (response.status === 401) {
-        logout();
-        return null;
+
+    try {
+        const response = await fetch(url, config);
+        
+        // Solo redirigir a login si es una petición crítica y realmente no autorizada
+        if (response.status === 401) {
+            console.warn('⚠️ Token inválido o expirado');
+            
+            // Solo redirigir si no es una petición de notificaciones
+            if (!url.includes('/notifications')) {
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                window.location.href = '/login.html';
+            }
+            return null;
+        }
+        
+        return response;
+    } catch (error) {
+        console.error('❌ Error en fetchWithAuth:', error);
+        return null; // No redirigir por errores de red
     }
-    return response;
 }
+
 
 // --- FUNCIONES DE CARGA Y VISUALIZACIÓN ---
 

@@ -3418,3 +3418,40 @@ main {
         width: auto;
     }
 }
+
+/* Botón para marcar como leída */
+.notification-actions {
+    display: flex;
+    align-items: center;
+    margin-left: 0.5rem;
+}
+
+.mark-read-btn {
+    background: #10b981;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    cursor: pointer;
+    font-size: 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.mark-read-btn:hover {
+    background: #059669;
+    transform: scale(1.1);
+}
+
+.notification-item {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between; /* Cambiado para acomodar el botón */
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid #f1f5f9;
+    transition: all 0.2s ease;
+    position: relative;
+}

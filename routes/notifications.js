@@ -2,8 +2,19 @@
 const express = require('express');
 const { authenticateToken } = require('./auth');
 const { db } = require('../database');
+const webpush = require('web-push'); // ✨ NUEVA LÍNEA
 
 const router = express.Router();
+
+// ✨ CONFIGURACIÓN WEB PUSH
+webpush.setVapidDetails(
+    'mailto:andresjgl1986@gmail.com', // Cambia por tu email
+    process.env.VAPID_PUBLIC_KEY || 'BNASXfnwv9-1BkWn9SrnrYIUM2uWRsab8of7a6ZaMojrWKirx8UNqOsSITCDsyv3d9jR_EXc4R2LzxGKZEgKEA0',
+    process.env.VAPID_PRIVATE_KEY || 'khN7893QjeohVXC1ZPlsie3kMt3cPc7nvncA-VjekIQ'
+);
+
+console.log('🔧 Web Push configurado con claves VAPID');
+
 
 // ============= FUNCIONES UTILITARIAS =============
 
@@ -315,9 +326,326 @@ async function checkUpcomingMatches() {
     }
 }
 
+// ============= RUTAS PARA PUSH NOTIFICATIONS =============
+
+// POST /api/notifications/subscribe - Suscribirse a notificaciones push
+router.post('/subscribe', authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { subscription, user_agent, device_type } = req.body;
+
+        console.log(`📱 Nueva suscripción push para usuario ${userId}`);
+
+        if (!subscription || !subscription.endpoint) {
+            return res.status(400).json({ error: 'Datos de suscripción incompletos' });
+        }
+
+        const { endpoint, keys } = subscription;
+        
+        if (!keys || !keys.p256dh || !keys.auth) {
+            return res.status(400).json({ error: 'Claves de suscripción faltantes' });
+        }
+
+        // Guardar o actualizar suscripción
+        const query = `
+            INSERT INTO push_subscriptions 
+            (user_id, endpoint, p256dh_key, auth_key, user_agent, device_type, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())
+            ON CONFLICT (user_id, endpoint) 
+            DO UPDATE SET 
+                p256dh_key = excluded.p256dh_key,
+                auth_key = excluded.auth_key,
+                user_agent = excluded.user_agent,
+                device_type = excluded.device_type,
+                is_active = TRUE,
+                updated_at = NOW()
+        `;
+
+        db.run(query, [
+            userId, 
+            endpoint, 
+            keys.p256dh, 
+            keys.auth, 
+            user_agent || '', 
+            device_type || 'desktop'
+        ], function(err) {
+            if (err) {
+                console.error('❌ Error guardando suscripción:', err);
+                return res.status(500).json({ error: 'Error guardando suscripción' });
+            }
+
+            console.log(`✅ Suscripción push guardada para usuario ${userId}`);
+            
+            // Enviar notificación de bienvenida
+            setTimeout(() => {
+                sendWelcomePushNotification(userId).catch(error => {
+                    console.error('⚠️ Error enviando notificación de bienvenida:', error);
+                });
+            }, 1000);
+
+            res.json({ 
+                message: 'Suscripción guardada exitosamente',
+                subscription_id: this.lastID || 'updated'
+            });
+        });
+
+    } catch (error) {
+        console.error('❌ Error en suscripción push:', error);
+        res.status(500).json({ error: 'Error interno del servidor' });
+    }
+});
+
+// POST /api/notifications/unsubscribe - Cancelar suscripción
+router.post('/unsubscribe', authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { endpoint } = req.body;
+
+        if (endpoint) {
+            // Desactivar suscripción específica
+            db.run(`
+                UPDATE push_subscriptions 
+                SET is_active = FALSE, updated_at = NOW()
+                WHERE user_id = ? AND endpoint = ?
+            `, [userId, endpoint], function(err) {
+                if (err) {
+                    console.error('❌ Error desactivando suscripción:', err);
+                    return res.status(500).json({ error: 'Error desactivando suscripción' });
+                }
+
+                console.log(`🔕 Suscripción desactivada para usuario ${userId}`);
+                res.json({ message: 'Suscripción desactivada' });
+            });
+        } else {
+            // Desactivar todas las suscripciones del usuario
+            db.run(`
+                UPDATE push_subscriptions 
+                SET is_active = FALSE, updated_at = NOW()
+                WHERE user_id = ?
+            `, [userId], function(err) {
+                if (err) {
+                    console.error('❌ Error desactivando suscripciones:', err);
+                    return res.status(500).json({ error: 'Error desactivando suscripciones' });
+                }
+
+                console.log(`🔕 Todas las suscripciones desactivadas para usuario ${userId}`);
+                res.json({ message: 'Todas las suscripciones desactivadas' });
+            });
+        }
+
+    } catch (error) {
+        console.error('❌ Error cancelando suscripción:', error);
+        res.status(500).json({ error: 'Error interno del servidor' });
+    }
+});
+
+// GET /api/notifications/push-status - Estado de notificaciones push del usuario
+router.get('/push-status', authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user.id;
+
+        db.all(`
+            SELECT COUNT(*) as total_subscriptions,
+                   COUNT(CASE WHEN is_active = TRUE THEN 1 END) as active_subscriptions,
+                   MAX(created_at) as last_subscription
+            FROM push_subscriptions 
+            WHERE user_id = ?
+        `, [userId], (err, result) => {
+            if (err) {
+                console.error('❌ Error obteniendo estado push:', err);
+                return res.status(500).json({ error: 'Error interno del servidor' });
+            }
+
+            const status = result[0] || { total_subscriptions: 0, active_subscriptions: 0 };
+            
+            res.json({
+                user_id: userId,
+                has_push_subscriptions: status.active_subscriptions > 0,
+                active_subscriptions: status.active_subscriptions,
+                total_subscriptions: status.total_subscriptions,
+                last_subscription: status.last_subscription
+            });
+        });
+
+    } catch (error) {
+        console.error('❌ Error obteniendo estado push:', error);
+        res.status(500).json({ error: 'Error interno del servidor' });
+    }
+});
+
+// ============= FUNCIONES PARA ENVIAR PUSH NOTIFICATIONS =============
+
+// Enviar notificación push a un usuario específico
+async function sendPushNotification(userId, title, message, data = {}) {
+    try {
+        console.log(`📱 Enviando push notification a usuario ${userId}: ${title}`);
+
+        // Obtener suscripciones activas del usuario
+        const subscriptions = await new Promise((resolve, reject) => {
+            db.all(`
+                SELECT endpoint, p256dh_key, auth_key, device_type
+                FROM push_subscriptions 
+                WHERE user_id = ? AND is_active = TRUE
+            `, [userId], (err, results) => {
+                if (err) reject(err);
+                else resolve(results || []);
+            });
+        });
+
+        if (subscriptions.length === 0) {
+            console.log(`⚠️ No hay suscripciones activas para usuario ${userId}`);
+            return { sent: 0, errors: 0 };
+        }
+
+        const payload = JSON.stringify({
+            title,
+            message,
+            url: '/dashboard.html',
+            type: data.type || 'general',
+            matchId: data.matchId,
+            timestamp: new Date().toISOString()
+        });
+
+        let sent = 0;
+        let errors = 0;
+
+        // Enviar a todas las suscripciones del usuario
+        for (const subscription of subscriptions) {
+            try {
+                const pushSubscription = {
+                    endpoint: subscription.endpoint,
+                    keys: {
+                        p256dh: subscription.p256dh_key,
+                        auth: subscription.auth_key
+                    }
+                };
+
+                await webpush.sendNotification(pushSubscription, payload);
+                sent++;
+                console.log(`✅ Push enviado a dispositivo ${subscription.device_type}`);
+
+            } catch (pushError) {
+                errors++;
+                console.error(`❌ Error enviando push a suscripción:`, pushError.message);
+                
+                // Si la suscripción es inválida, desactivarla
+                if (pushError.statusCode === 410 || pushError.statusCode === 404) {
+                    console.log('🔕 Desactivando suscripción inválida');
+                    db.run(`
+                        UPDATE push_subscriptions 
+                        SET is_active = FALSE 
+                        WHERE endpoint = ?
+                    `, [subscription.endpoint]);
+                }
+            }
+        }
+
+        console.log(`📊 Push notifications enviadas: ${sent} exitosas, ${errors} errores`);
+        return { sent, errors };
+
+    } catch (error) {
+        console.error('❌ Error general enviando push notification:', error);
+        return { sent: 0, errors: 1 };
+    }
+}
+
+// Enviar notificación push a múltiples usuarios
+async function sendPushNotificationToUsers(userIds, title, message, data = {}) {
+    const results = [];
+    
+    for (const userId of userIds) {
+        try {
+            const result = await sendPushNotification(userId, title, message, data);
+            results.push({ userId, ...result });
+        } catch (error) {
+            console.error(`❌ Error enviando push a usuario ${userId}:`, error);
+            results.push({ userId, sent: 0, errors: 1 });
+        }
+    }
+    
+    const totalSent = results.reduce((sum, r) => sum + r.sent, 0);
+    const totalErrors = results.reduce((sum, r) => sum + r.errors, 0);
+    
+    console.log(`📊 Resumen push notifications: ${totalSent} enviadas, ${totalErrors} errores`);
+    return { totalSent, totalErrors, details: results };
+}
+
+// Notificación de bienvenida
+async function sendWelcomePushNotification(userId) {
+    return await sendPushNotification(
+        userId,
+        '🎉 ¡Notificaciones Activadas!',
+        'Recibirás alertas de partidos próximos y resultados actualizados',
+        { type: 'welcome' }
+    );
+}
+
+// Notificar resultado con push notifications
+async function notifyMatchResultWithPush(matchId, homeScore, awayScore) {
+    try {
+        console.log(`🔔 Enviando push notifications para resultado: ${matchId}`);
+
+        // Obtener información del partido
+        const match = await new Promise((resolve, reject) => {
+            db.get(`
+                SELECT m.*, t.name as tournament_name, tp.name as phase_name
+                FROM matches_new m
+                LEFT JOIN tournaments t ON m.tournament_id = t.id
+                LEFT JOIN tournament_phases tp ON m.phase_id = tp.id
+                WHERE m.id = ?
+            `, [matchId], (err, result) => {
+                if (err) reject(err);
+                else resolve(result);
+            });
+        });
+
+        if (!match) {
+            console.error('❌ Partido no encontrado para push notification');
+            return;
+        }
+
+        // Obtener usuarios que predijeron este partido
+        const users = await new Promise((resolve, reject) => {
+            db.all(`
+                SELECT DISTINCT p.user_id
+                FROM predictions_new p
+                JOIN users u ON p.user_id = u.id
+                WHERE p.match_id = ? AND u.is_active = true
+            `, [matchId], (err, results) => {
+                if (err) reject(err);
+                else resolve(results || []);
+            });
+        });
+
+        if (users.length === 0) {
+            console.log('⚠️ No hay usuarios para notificar');
+            return;
+        }
+
+        const userIds = users.map(u => u.user_id);
+        const title = '📊 Resultado Actualizado';
+        const message = `${match.home_team} ${homeScore}-${awayScore} ${match.away_team}`;
+        
+        // Enviar push notifications
+        await sendPushNotificationToUsers(userIds, title, message, {
+            type: 'result_updated',
+            matchId: matchId
+        });
+
+        console.log(`✅ Push notifications enviadas para ${match.home_team} vs ${match.away_team}`);
+
+    } catch (error) {
+        console.error('❌ Error enviando push notifications de resultado:', error);
+    }
+}
+
 // ============= EXPORTAR FUNCIONES =============
 
 module.exports = router;
 module.exports.createNotification = createNotification;
 module.exports.notifyMatchResult = notifyMatchResult;
 module.exports.checkUpcomingMatches = checkUpcomingMatches;
+module.exports.sendPushNotification = sendPushNotification;
+module.exports.sendPushNotificationToUsers = sendPushNotificationToUsers;
+module.exports.notifyMatchResultWithPush = notifyMatchResultWithPush;
+

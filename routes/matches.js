@@ -3,6 +3,7 @@ const express = require('express');
 const { authenticateToken, requireAdmin } = require('./auth'); // ✅ Importar todo junto
 
 const { notifyMatchResult } = require('./notifications');
+const { notifyMatchResultWithPush } = require('./notifications');
 
 const router = express.Router();
 
@@ -275,6 +276,17 @@ router.post('/:matchId/result', authenticateToken, requireAdmin, async (req, res
                         console.error('⚠️ Error iniciando notificaciones:', notifError);
                     }
                     // 🔔 ✨ FIN DE NOTIFICACIONES
+
+                    // 📱 PUSH NOTIFICATIONS (NUEVAS)
+                    try {
+                        const { notifyMatchResultWithPush } = require('./notifications');
+                        console.log(`📱 Enviando push notifications para partido ${matchId}`);
+                        notifyMatchResultWithPush(matchId, home_score, away_score).catch(pushErr => {
+                            console.error('⚠️ Error enviando push notifications:', pushErr);
+                        });
+                    } catch (pushError) {
+                        console.error('⚠️ Error iniciando push notifications:', pushError);
+                    }
                     
                     res.json({
                         message: 'Resultado actualizado exitosamente',
