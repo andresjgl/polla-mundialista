@@ -1560,7 +1560,7 @@ function generateTemporaryPassword() {
 
 // ============= GESTIÓN DE CONTRASEÑAS =============
 
-// POST /api/admin/users/:id/reset-password - VERSIÓN SIMPLIFICADA
+// POST /api/admin/users/:id/reset-password - VERSIÓN CORREGIDA CON FLAG
 router.post('/users/:id/reset-password', authenticateToken, requireAdmin, async (req, res) => {
     try {
         console.log('🔐 Reset password route hit - User ID:', req.params.id);
@@ -1580,19 +1580,30 @@ router.post('/users/:id/reset-password', authenticateToken, requireAdmin, async 
         // Hashear la nueva contraseña
         const hashedPassword = await bcrypt.hash(temporaryPassword, 10);
         
-        // Actualizar solo la contraseña (sin must_change_password por ahora)
-        db.run('UPDATE users SET password = $1 WHERE id = $2', [hashedPassword, parseInt(id)], function(err) {
+        // ✅ NUEVO: ACTUALIZAR CONTRASEÑA Y ESTABLECER FLAG DE CAMBIO OBLIGATORIO
+        const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL;
+        
+        const updateQuery = isProduction ? 
+            'UPDATE users SET password = $1, must_change_password = $2 WHERE id = $3' :
+            'UPDATE users SET password = ?, must_change_password = ? WHERE id = ?';
+        
+        const params = [hashedPassword, true, parseInt(id)];
+        
+        console.log('🔧 Actualizando contraseña con flag obligatorio...');
+        
+        db.run(updateQuery, params, function(err) {
             if (err) {
                 console.error('❌ Error actualizando contraseña:', err);
                 return res.status(500).json({ error: 'Error actualizando contraseña' });
             }
 
-            console.log(`✅ Contraseña reseteada para usuario ${id}`);
+            console.log(`✅ Contraseña reseteada para usuario ${id} con must_change_password = TRUE`);
 
             res.json({
                 message: 'Contraseña reseteada exitosamente',
                 user_id: id,
-                temporary_password: temporaryPassword
+                temporary_password: temporaryPassword,
+                requires_password_change: true  // ✅ INFORMAR AL FRONTEND
             });
         });
         
@@ -1601,6 +1612,7 @@ router.post('/users/:id/reset-password', authenticateToken, requireAdmin, async 
         res.status(500).json({ error: 'Error interno: ' + error.message });
     }
 });
+
 
 
 
