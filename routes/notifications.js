@@ -329,6 +329,7 @@ async function checkUpcomingMatches() {
 // ============= RUTAS PARA PUSH NOTIFICATIONS =============
 
 // POST /api/notifications/subscribe - Suscribirse a notificaciones push
+// POST /api/notifications/subscribe - VERSIÓN CORREGIDA
 router.post('/subscribe', authenticateToken, async (req, res) => {
     try {
         const userId = req.user.id;
@@ -346,29 +347,41 @@ router.post('/subscribe', authenticateToken, async (req, res) => {
             return res.status(400).json({ error: 'Claves de suscripción faltantes' });
         }
 
-        // Guardar o actualizar suscripción
-        const query = `
-            INSERT INTO push_subscriptions 
-            (user_id, endpoint, p256dh_key, auth_key, user_agent, device_type, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())
-            ON CONFLICT (user_id, endpoint) 
-            DO UPDATE SET 
-                p256dh_key = excluded.p256dh_key,
-                auth_key = excluded.auth_key,
-                user_agent = excluded.user_agent,
-                device_type = excluded.device_type,
-                is_active = TRUE,
-                updated_at = NOW()
-        `;
+        // ✅ USAR SINTAXIS CORRECTA SEGÚN ENTORNO
+        const { db } = require('../database');
+        const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL;
 
-        db.run(query, [
-            userId, 
-            endpoint, 
-            keys.p256dh, 
-            keys.auth, 
-            user_agent || '', 
-            device_type || 'desktop'
-        ], function(err) {
+        // Para PostgreSQL usamos INSERT ... ON CONFLICT, para SQLite usamos INSERT OR REPLACE
+        let query;
+        let params;
+
+        if (isProduction) {
+            // PostgreSQL
+            query = `
+                INSERT INTO push_subscriptions 
+                (user_id, endpoint, p256dh_key, auth_key, user_agent, device_type, created_at, updated_at)
+                VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+                ON CONFLICT (user_id, endpoint) 
+                DO UPDATE SET 
+                    p256dh_key = EXCLUDED.p256dh_key,
+                    auth_key = EXCLUDED.auth_key,
+                    user_agent = EXCLUDED.user_agent,
+                    device_type = EXCLUDED.device_type,
+                    is_active = TRUE,
+                    updated_at = NOW()
+            `;
+            params = [userId, endpoint, keys.p256dh, keys.auth, user_agent || '', device_type || 'desktop'];
+        } else {
+            // SQLite
+            query = `
+                INSERT OR REPLACE INTO push_subscriptions 
+                (user_id, endpoint, p256dh_key, auth_key, user_agent, device_type, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+            `;
+            params = [userId, endpoint, keys.p256dh, keys.auth, user_agent || '', device_type || 'desktop'];
+        }
+
+        db.run(query, params, function(err) {
             if (err) {
                 console.error('❌ Error guardando suscripción:', err);
                 return res.status(500).json({ error: 'Error guardando suscripción' });
@@ -376,7 +389,7 @@ router.post('/subscribe', authenticateToken, async (req, res) => {
 
             console.log(`✅ Suscripción push guardada para usuario ${userId}`);
             
-            // Enviar notificación de bienvenida
+            // Enviar notificación de bienvenida (sin esperar)
             setTimeout(() => {
                 sendWelcomePushNotification(userId).catch(error => {
                     console.error('⚠️ Error enviando notificación de bienvenida:', error);
@@ -394,6 +407,7 @@ router.post('/subscribe', authenticateToken, async (req, res) => {
         res.status(500).json({ error: 'Error interno del servidor' });
     }
 });
+
 
 // POST /api/notifications/unsubscribe - Cancelar suscripción
 router.post('/unsubscribe', authenticateToken, async (req, res) => {
@@ -476,19 +490,30 @@ router.get('/push-status', authenticateToken, async (req, res) => {
 // ============= FUNCIONES PARA ENVIAR PUSH NOTIFICATIONS =============
 
 // Enviar notificación push a un usuario específico
+// Enviar notificación push a un usuario específico - VERSIÓN CORREGIDA
 async function sendPushNotification(userId, title, message, data = {}) {
     try {
         console.log(`📱 Enviando push notification a usuario ${userId}: ${title}`);
 
-        // Obtener suscripciones activas del usuario
+        // ✅ USAR FUNCIÓN DE DATABASE.JS EN LUGAR DE CONSULTA DIRECTA
+        const { db } = require('../database');
+        
         const subscriptions = await new Promise((resolve, reject) => {
-            db.all(`
+            // Usar sintaxis correcta según el entorno
+            const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL;
+            const query = `
                 SELECT endpoint, p256dh_key, auth_key, device_type
                 FROM push_subscriptions 
-                WHERE user_id = ? AND is_active = TRUE
-            `, [userId], (err, results) => {
-                if (err) reject(err);
-                else resolve(results || []);
+                WHERE user_id = ${isProduction ? '$1' : '?'} AND is_active = TRUE
+            `;
+            
+            db.all(query, [userId], (err, results) => {
+                if (err) {
+                    console.error('❌ Error obteniendo suscripciones:', err);
+                    reject(err);
+                } else {
+                    resolve(results || []);
+                }
             });
         });
 
@@ -526,16 +551,18 @@ async function sendPushNotification(userId, title, message, data = {}) {
 
             } catch (pushError) {
                 errors++;
-                console.error(`❌ Error enviando push a suscripción:`, pushError.message);
+                console.error(`❌ Error enviando push:`, pushError.message);
                 
                 // Si la suscripción es inválida, desactivarla
                 if (pushError.statusCode === 410 || pushError.statusCode === 404) {
                     console.log('🔕 Desactivando suscripción inválida');
-                    db.run(`
+                    const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL;
+                    const updateQuery = `
                         UPDATE push_subscriptions 
                         SET is_active = FALSE 
-                        WHERE endpoint = ?
-                    `, [subscription.endpoint]);
+                        WHERE endpoint = ${isProduction ? '$1' : '?'}
+                    `;
+                    db.run(updateQuery, [subscription.endpoint]);
                 }
             }
         }
@@ -581,21 +608,32 @@ async function sendWelcomePushNotification(userId) {
 }
 
 // Notificar resultado con push notifications
+// Notificar resultado con push notifications - VERSIÓN CORREGIDA
 async function notifyMatchResultWithPush(matchId, homeScore, awayScore) {
     try {
         console.log(`🔔 Enviando push notifications para resultado: ${matchId}`);
 
-        // Obtener información del partido
+        // ✅ USAR FUNCIÓN DE DATABASE.JS
+        const { db } = require('../database');
+        const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL;
+
+        // Obtener información del partido con sintaxis correcta
         const match = await new Promise((resolve, reject) => {
-            db.get(`
+            const query = `
                 SELECT m.*, t.name as tournament_name, tp.name as phase_name
                 FROM matches_new m
                 LEFT JOIN tournaments t ON m.tournament_id = t.id
                 LEFT JOIN tournament_phases tp ON m.phase_id = tp.id
-                WHERE m.id = ?
-            `, [matchId], (err, result) => {
-                if (err) reject(err);
-                else resolve(result);
+                WHERE m.id = ${isProduction ? '$1' : '?'}
+            `;
+            
+            db.get(query, [matchId], (err, result) => {
+                if (err) {
+                    console.error('❌ Error obteniendo partido:', err);
+                    reject(err);
+                } else {
+                    resolve(result);
+                }
             });
         });
 
@@ -606,14 +644,20 @@ async function notifyMatchResultWithPush(matchId, homeScore, awayScore) {
 
         // Obtener usuarios que predijeron este partido
         const users = await new Promise((resolve, reject) => {
-            db.all(`
+            const query = `
                 SELECT DISTINCT p.user_id
                 FROM predictions_new p
                 JOIN users u ON p.user_id = u.id
-                WHERE p.match_id = ? AND u.is_active = true
-            `, [matchId], (err, results) => {
-                if (err) reject(err);
-                else resolve(results || []);
+                WHERE p.match_id = ${isProduction ? '$1' : '?'} AND u.is_active = true
+            `;
+            
+            db.all(query, [matchId], (err, results) => {
+                if (err) {
+                    console.error('❌ Error obteniendo usuarios:', err);
+                    reject(err);
+                } else {
+                    resolve(results || []);
+                }
             });
         });
 
@@ -638,6 +682,7 @@ async function notifyMatchResultWithPush(matchId, homeScore, awayScore) {
         console.error('❌ Error enviando push notifications de resultado:', error);
     }
 }
+
 
 // ============= EXPORTAR FUNCIONES =============
 
