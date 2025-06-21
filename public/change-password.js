@@ -66,12 +66,38 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const data = await response.json();
 
-            if (response.ok) {
-                showMessage('¡Contraseña cambiada exitosamente!', 'success');
-                
-                // Actualizar datos del usuario (quitar flag temporal)
-                const updatedUser = { ...user, must_change_password: false };
-                localStorage.setItem('user', JSON.stringify(updatedUser));
+            // En change-password.js, reemplaza la parte del success:
+if (response.ok) {
+    showMessage('¡Contraseña cambiada exitosamente!', 'success');
+    
+    // ✅ NUEVO: OBTENER DATOS FRESCOS DEL USUARIO
+    try {
+        const userResponse = await fetch('/api/auth/me', {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (userResponse.ok) {
+            const freshUserData = await userResponse.json();
+            console.log('📊 Datos frescos del usuario:', freshUserData);
+            
+            // Actualizar localStorage con datos frescos
+            const updatedUser = {
+                ...freshUserData,
+                must_change_password: false  // Ya cambió la contraseña
+            };
+            
+            localStorage.setItem('user', JSON.stringify(updatedUser));
+            console.log('✅ Datos del usuario actualizados en localStorage');
+                }
+                } catch (error) {
+                    console.warn('⚠️ Error obteniendo datos frescos:', error);
+                    // Continuar con los datos anteriores actualizados
+                    const updatedUser = { ...user, must_change_password: false };
+                    localStorage.setItem('user', JSON.stringify(updatedUser));
+                }
                 
                 setTimeout(() => {
                     if (user.is_admin) {
