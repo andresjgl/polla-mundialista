@@ -26,6 +26,7 @@ router.get('/active-tournament', (req, res) => {
             }
             
             console.log('🏆 Torneo activo encontrado:', tournament.name, 'ID:', tournament.id);
+            console.log('📋 Reglas encontradas:', tournament.rules ? 'SÍ' : 'NO');
             
             // Paso 2: Contar partidos del torneo
             db.get('SELECT COUNT(*) as total FROM matches_new WHERE tournament_id = ?', [tournament.id], (err2, matchesResult) => {
@@ -66,6 +67,7 @@ router.get('/active-tournament', (req, res) => {
                             start_date: tournament.start_date,
                             end_date: tournament.end_date,
                             status: tournament.status,
+                            rules: tournament.rules || '',
                             total_matches: matchesResult.total || 0,
                             finished_matches: finishedResult.finished || 0,
                             total_predictions: predictionsResult.total || 0
@@ -101,7 +103,7 @@ router.get('/tournaments', authenticateToken, requireAdmin, (req, res) => {
 // POST /api/admin/tournaments - Crear nuevo torneo
 router.post('/tournaments', authenticateToken, requireAdmin, async (req, res) => {
     try {
-        const { name, start_date, end_date, description } = req.body;
+        const { name, start_date, end_date, description, rules } = req.body
 
         if (!name || !start_date || !end_date) {
             return res.status(400).json({ 
@@ -115,7 +117,7 @@ router.post('/tournaments', authenticateToken, requireAdmin, async (req, res) =>
         db.run(`
             INSERT INTO tournaments (name, start_date, end_date, status)
             VALUES (?, ?, ?, 'upcoming')
-        `, [name, start_date, end_date], function(err) {
+        `, [name, start_date, end_date, description || '', rules || ''], function(err) {
             if (err) {
                 console.error('Error creando torneo:', err);
                 return res.status(500).json({ 
@@ -132,6 +134,8 @@ router.post('/tournaments', authenticateToken, requireAdmin, async (req, res) =>
                     name,
                     start_date,
                     end_date,
+                    description: description || '',
+                    rules: rules || '',
                     status: 'upcoming'
                 }
             });
@@ -143,6 +147,60 @@ router.post('/tournaments', authenticateToken, requireAdmin, async (req, res) =>
         });
     }
 });
+
+// PUT /api/admin/tournaments/:id - Actualizar torneo (NUEVA RUTA)
+router.put('/tournaments/:id', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { name, start_date, end_date, description, rules } = req.body;
+
+        if (!name || !start_date || !end_date) {
+            return res.status(400).json({ 
+                error: 'Nombre, fecha de inicio y fecha de fin son requeridos' 
+            });
+        }
+
+        const { db } = require('../database');
+
+        db.run(`
+            UPDATE tournaments 
+            SET name = ?, start_date = ?, end_date = ?, description = ?, rules = ?
+            WHERE id = ?
+        `, [name, start_date, end_date, description || '', rules || '', id], function(err) {
+            if (err) {
+                console.error('Error actualizando torneo:', err);
+                return res.status(500).json({ 
+                    error: 'Error actualizando torneo: ' + err.message 
+                });
+            }
+
+            if (this.changes === 0) {
+                return res.status(404).json({ error: 'Torneo no encontrado' });
+            }
+
+            console.log(`✅ Torneo ${id} actualizado con reglas`);
+
+            res.json({
+                message: 'Torneo actualizado exitosamente',
+                tournament: {
+                    id: parseInt(id),
+                    name,
+                    start_date,
+                    end_date,
+                    description: description || '',
+                    rules: rules || '',
+                    status: 'active' // Asumiendo que se actualiza cuando está activo
+                }
+            });
+        });
+    } catch (error) {
+        console.error('Error actualizando torneo:', error);
+        res.status(500).json({ 
+            error: 'Error interno del servidor: ' + error.message 
+        });
+    }
+});
+
 
 
 // PUT /api/admin/tournaments/:id/status - Cambiar estado del torneo

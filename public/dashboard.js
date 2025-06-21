@@ -12,6 +12,8 @@ const predictionsPerPage = 10;
 let notificationsVisible = false;
 let unreadCount = 0;
 
+let currentTournamentRules = '';
+
 let pushSubscription = null;
 const applicationServerKey = 'BNASXfnwv9-1BkWn9SrnrYIUM2uWRsab8of7a6ZaMojrWKirx8UNqOsSITCDsyv3d9jR_EXc4R2LzxGKZEgKEA0'; // Lo configuraremos después
 
@@ -557,14 +559,46 @@ async function loadActiveTournament() {
         
         if (data.active_tournament) {
             displayActiveTournament(data.active_tournament);
+
+            // ✨ AÑADIR LÓGICA DE REGLAS AQUÍ
+            const tournament = data.active_tournament;
+            currentTournamentRules = tournament.rules || '';
+            
+            // Mostrar/ocultar botón de reglas
+            const rulesButton = document.getElementById('rulesButton');
+            if (rulesButton) {
+                if (currentTournamentRules && currentTournamentRules.trim() !== '') {
+                    rulesButton.style.display = 'block';
+                } else {
+                    rulesButton.style.display = 'none';
+                }
+            }
+
             return data.active_tournament;
         } else {
             displayNoActiveTournament();
+
+            // ✨ OCULTAR BOTÓN DE REGLAS SI NO HAY TORNEO
+            const rulesButton = document.getElementById('rulesButton');
+            if (rulesButton) {
+                rulesButton.style.display = 'none';
+            }
+
             return null;
         }
+
+
+
     } catch (error) {
         console.error('Error cargando torneo activo:', error);
         displayNoActiveTournament();
+
+        // ✨ OCULTAR BOTÓN DE REGLAS EN CASO DE ERROR
+        const rulesButton = document.getElementById('rulesButton');
+        if (rulesButton) {
+            rulesButton.style.display = 'none';
+        }
+
         return null;
     }
 }
@@ -1309,6 +1343,70 @@ function formatFullDate(dateString) {
         });
     } catch (error) {
         return "Fecha inválida";
+    }
+}
+
+// Función para mostrar reglas del torneo
+window.showTournamentRules = function() {
+    if (!currentTournamentRules || currentTournamentRules.trim() === '') {
+        showTemporaryMessage('📋 Este torneo no tiene reglas definidas');
+        return;
+    }
+
+    const modal = document.createElement('div');
+    modal.className = 'rules-modal';
+    modal.innerHTML = `
+        <div class="modal-content large">
+            <div class="modal-header">
+                <h3>📋 Reglas del Torneo</h3>
+                <button class="close-modal" onclick="closeRulesModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="rules-content">
+                    ${formatRulesText(currentTournamentRules)}
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-primary" onclick="closeRulesModal()">
+                    Entendido
+                </button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+}
+
+// Formatear texto de reglas con saltos de línea y viñetas
+function formatRulesText(rulesText) {
+    if (!rulesText) return '<p>No hay reglas definidas para este torneo.</p>';
+    
+    // Convertir saltos de línea a <br>
+    let formatted = rulesText.replace(/\n/g, '<br>');
+    
+    // Convertir viñetas • en elementos de lista
+    formatted = formatted.replace(/•\s*([^<br>]+)/g, '<li>$1</li>');
+    
+    // Si hay elementos de lista, envolverlos en <ul>
+    if (formatted.includes('<li>')) {
+        formatted = formatted.replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>');
+        // Limpiar <br> antes y después de listas
+        formatted = formatted.replace(/<br>\s*<ul>/g, '<ul>');
+        formatted = formatted.replace(/<\/ul>\s*<br>/g, '</ul>');
+    }
+    
+    // Convertir párrafos (doble salto de línea)
+    formatted = formatted.replace(/<br><br>/g, '</p><p>');
+    formatted = '<p>' + formatted + '</p>';
+    
+    return formatted;
+}
+
+// Cerrar modal de reglas
+window.closeRulesModal = function() {
+    const modal = document.querySelector('.rules-modal');
+    if (modal) {
+        modal.remove();
     }
 }
 

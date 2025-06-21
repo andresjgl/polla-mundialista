@@ -371,6 +371,20 @@ function showCreateTournamentForm() {
                         <textarea id="description" name="description" rows="3"
                                 placeholder="Descripción del torneo..."></textarea>
                     </div>
+
+                    <!-- ✨ NUEVO CAMPO DE REGLAS -->
+                    <div class="form-group">
+                        <label for="tournamentRules">Reglas del Torneo</label>
+                        <textarea id="tournamentRules" name="rules" rows="8"
+                                placeholder="Escribe aquí las reglas del torneo...
+                                Ejemplo:
+                                • Puntuación por resultado correcto: 1 punto
+                                • Puntuación por marcador exacto: 3 puntos  
+                                • Fases eliminatorias tienen multiplicador
+                                • No se permiten empates en eliminatorias
+                                • Los puntos se calculan automáticamente"></textarea>
+                        <small>Puedes usar saltos de línea y viñetas (•) para formatear las reglas</small>
+                    </div>
                     
                     <div class="modal-actions">
                         <button type="button" class="btn btn-secondary" onclick="closeModal()">
@@ -398,7 +412,8 @@ async function createTournament(event) {
         name: formData.get('name'),
         start_date: formData.get('start_date'),
         end_date: formData.get('end_date'),
-        description: formData.get('description')
+        description: formData.get('description'),
+        rules: formData.get('rules') 
     };
 
     try {
