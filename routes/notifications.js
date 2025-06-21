@@ -18,52 +18,38 @@ console.log('🔧 Web Push configurado con claves VAPID');
 
 // ============= FUNCIONES UTILITARIAS =============
 
-// Crear notificación
+// Crear notificación - VERSIÓN CORREGIDA
 async function createNotification(userId, type, title, message, data = {}) {
     return new Promise((resolve, reject) => {
-        const query = `
-            INSERT INTO notifications (user_id, type, title, message, data, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, NOW(), NOW())
-        `;
+        const { db } = require('../database');
+        const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL;
         
-        db.run(query, [userId, type, title, message, JSON.stringify(data)], function(err) {
+        // ✅ USAR SINTAXIS CORRECTA SEGÚN ENTORNO
+        let query, params;
+        
+        if (isProduction) {
+            // PostgreSQL
+            query = `
+                INSERT INTO notifications (user_id, type, title, message, data, created_at, updated_at)
+                VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
+            `;
+            params = [userId, type, title, message, JSON.stringify(data)];
+        } else {
+            // SQLite
+            query = `
+                INSERT INTO notifications (user_id, type, title, message, data, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+            `;
+            params = [userId, type, title, message, JSON.stringify(data)];
+        }
+        
+        db.run(query, params, function(err) {
             if (err) {
                 console.error('❌ Error creando notificación:', err);
                 reject(err);
             } else {
                 console.log(`🔔 Notificación creada para usuario ${userId}: ${title}`);
                 resolve(this.lastID);
-            }
-        });
-    });
-}
-
-// Detectar cambio de posición
-async function detectPositionChange(userId) {
-    return new Promise((resolve, reject) => {
-        const query = `
-            SELECT 
-                ROW_NUMBER() OVER (ORDER BY total_points DESC) as position,
-                total_points,
-                name
-            FROM (
-                SELECT 
-                    u.id,
-                    u.name,
-                    COALESCE(SUM(p.points_earned), 0) as total_points
-                FROM users u
-                LEFT JOIN predictions_new p ON u.id = p.user_id
-                WHERE u.is_active = true
-                GROUP BY u.id, u.name
-            ) ranked
-        `;
-        
-        db.all(query, [], (err, results) => {
-            if (err) {
-                reject(err);
-            } else {
-                const userRanking = results.find(r => r.id == userId);
-                resolve(userRanking || { position: 0, total_points: 0 });
             }
         });
     });
@@ -197,17 +183,21 @@ router.post('/mark-all-read', authenticateToken, async (req, res) => {
 // ============= FUNCIONES DE NOTIFICACIÓN AUTOMÁTICA =============
 
 // Notificación cuando se actualiza resultado de partido
+// Notificación cuando se actualiza resultado de partido - VERSIÓN SIMPLIFICADA
 async function notifyMatchResult(matchId, homeScore, awayScore) {
     try {
         console.log(`🔔 Creando notificaciones para resultado: ${matchId}`);
 
-        // Obtener información del partido y predicciones
+        // Obtener información del partido
+        const { db } = require('../database');
+        const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL;
+        
         const matchQuery = `
             SELECT m.*, t.name as tournament_name, tp.name as phase_name
             FROM matches_new m
             LEFT JOIN tournaments t ON m.tournament_id = t.id
             LEFT JOIN tournament_phases tp ON m.phase_id = tp.id
-            WHERE m.id = ?
+            WHERE m.id = ${isProduction ? '$1' : '?'}
         `;
 
         const match = await new Promise((resolve, reject) => {
@@ -224,7 +214,7 @@ async function notifyMatchResult(matchId, homeScore, awayScore) {
             SELECT DISTINCT p.user_id, u.name
             FROM predictions_new p
             JOIN users u ON p.user_id = u.id
-            WHERE p.match_id = ? AND u.is_active = true
+            WHERE p.match_id = ${isProduction ? '$1' : '?'} AND u.is_active = true
         `;
 
         const users = await new Promise((resolve, reject) => {
@@ -234,21 +224,10 @@ async function notifyMatchResult(matchId, homeScore, awayScore) {
             });
         });
 
-        // Crear notificación para cada usuario
+        // ✨ VERSIÓN SIMPLIFICADA - SIN CALCULAR POSICIONES
         for (const user of users) {
-            // Calcular nueva posición (opcional, puede ser costoso)
-            let positionInfo = '';
-            try {
-                const ranking = await detectPositionChange(user.user_id);
-                if (ranking.position) {
-                    positionInfo = ` | Posición actual: #${ranking.position}`;
-                }
-            } catch (posErr) {
-                console.warn('⚠️ Error calculando posición:', posErr);
-            }
-
             const title = `📊 Resultado Actualizado`;
-            const message = `${match.home_team} ${homeScore}-${awayScore} ${match.away_team} (${match.phase_name})${positionInfo}`;
+            const message = `${match.home_team} ${homeScore}-${awayScore} ${match.away_team} (${match.phase_name})`;
             
             const data = {
                 match_id: matchId,
@@ -262,15 +241,17 @@ async function notifyMatchResult(matchId, homeScore, awayScore) {
                 }
             };
 
+            // ✅ CREAR NOTIFICACIÓN SIN CALCULAR POSICIÓN
             await createNotification(user.user_id, 'result_updated', title, message, data);
         }
 
-        console.log(`✅ Notificaciones de resultado enviadas a ${users.length} usuarios`);
+        console.log(`✅ Notificaciones simples enviadas a ${users.length} usuarios`);
 
     } catch (error) {
         console.error('❌ Error enviando notificaciones de resultado:', error);
     }
 }
+
 
 // Verificar partidos próximos sin predicción
 async function checkUpcomingMatches() {
