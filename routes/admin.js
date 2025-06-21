@@ -5,6 +5,19 @@ const { db } = require('../database');
 
 const router = express.Router();
 
+// ✨ MIDDLEWARE PARA VERIFICAR ADMIN (AÑADIR SI NO EXISTE)
+function requireAdmin(req, res, next) {
+    console.log('🔐 Verificando permisos de admin para usuario:', req.user?.id, 'is_admin:', req.user?.is_admin);
+    
+    if (!req.user || !req.user.is_admin) {
+        console.log('❌ Acceso denegado - Usuario no es admin');
+        return res.status(403).json({ error: 'Acceso denegado. Se requieren permisos de administrador.' });
+    }
+    
+    console.log('✅ Usuario admin verificado');
+    next();
+}
+
 
 // ============= GESTIÓN DE TORNEOS =============
 
@@ -1560,85 +1573,25 @@ function generateTemporaryPassword() {
 
 // ============= GESTIÓN DE CONTRASEÑAS =============
 
-// POST /api/admin/users/:id/reset-password - VERSIÓN CORREGIDA PARA POSTGRESQL
+// POST /api/admin/users/:id/reset-password - VERSIÓN SIMPLIFICADA PARA DEBUG
 router.post('/users/:id/reset-password', authenticateToken, requireAdmin, async (req, res) => {
     try {
-        const { id } = req.params;
-        const { db } = require('../database');
-        const bcrypt = require('bcrypt');
-
-        console.log(`🔐 Reseteando contraseña para usuario ${id}`);
-
-        // Verificar que el usuario existe
-        db.get('SELECT id, name, email FROM users WHERE id = ?', [id], async (err, user) => {
-            if (err) {
-                console.error('❌ Error verificando usuario:', err);
-                return res.status(500).json({ error: 'Error interno del servidor' });
-            }
-
-            if (!user) {
-                return res.status(404).json({ error: 'Usuario no encontrado' });
-            }
-
-            // Generar contraseña temporal
-            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-            let temporaryPassword = '';
-            for (let i = 0; i < 8; i++) {
-                temporaryPassword += chars.charAt(Math.floor(Math.random() * chars.length));
-            }
-            
-            try {
-                // Hashear la nueva contraseña
-                const hashedPassword = await bcrypt.hash(temporaryPassword, 10);
-                
-                // ✅ CONSULTA FIJA PARA POSTGRESQL (SIN INTERPOLACIÓN CONDICIONAL)
-                const query = `
-                    UPDATE users 
-                    SET password = $1, 
-                        must_change_password = $2,
-                        updated_at = NOW()
-                    WHERE id = $3
-                `;
-                
-                const params = [hashedPassword, true, parseInt(id)];
-                
-                console.log('🔧 Ejecutando query de reset con parámetros:', [hashedPassword.substring(0, 10) + '...', true, parseInt(id)]);
-                
-                db.run(query, params, function(updateErr) {
-                    if (updateErr) {
-                        console.error('❌ Error actualizando contraseña:', updateErr);
-                        return res.status(500).json({ error: 'Error actualizando contraseña: ' + updateErr.message });
-                    }
-
-                    if (this.changes === 0) {
-                        return res.status(404).json({ error: 'Usuario no encontrado' });
-                    }
-
-                    console.log(`✅ Contraseña reseteada para ${user.name} - Cambios: ${this.changes}`);
-
-                    res.json({
-                        message: 'Contraseña reseteada exitosamente',
-                        user: {
-                            id: user.id,
-                            name: user.name,
-                            email: user.email
-                        },
-                        temporary_password: temporaryPassword,
-                        must_change_password: true
-                    });
-                });
-                
-            } catch (hashError) {
-                console.error('❌ Error hasheando contraseña:', hashError);
-                res.status(500).json({ error: 'Error procesando contraseña: ' + hashError.message });
-            }
+        console.log('🔐 Reset password route hit - User ID:', req.params.id);
+        console.log('🔐 Request user:', req.user?.id, 'is_admin:', req.user?.is_admin);
+        
+        res.json({
+            message: 'Ruta funcionando correctamente',
+            user_id: req.params.id,
+            admin_user: req.user?.id,
+            temporary_password: 'TEST123' // Solo para testing
         });
-
+        
     } catch (error) {
-        console.error('❌ Error reseteando contraseña:', error);
-        res.status(500).json({ error: 'Error interno del servidor: ' + error.message });
+        console.error('❌ Error en ruta reset:', error);
+        res.status(500).json({ error: 'Error interno: ' + error.message });
     }
 });
+
 
 
 // GET /api/admin/users - Listar usuarios (VERSIÓN FINAL CORREGIDA)
