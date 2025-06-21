@@ -71,6 +71,81 @@ app.get('/api/info', async (req, res) => {
     }
 });
 
+// Ruta pública para estadísticas de la página de inicio
+app.get('/api/public/stats', async (req, res) => {
+    try {
+        console.log('📊 Cargando estadísticas públicas...');
+        
+        const { db } = require('./database');
+        
+        // Obtener estadísticas en paralelo
+        const statsPromises = [
+            // Contar usuarios activos (no admins)
+            new Promise((resolve) => {
+                db.get('SELECT COUNT(*) as count FROM users WHERE is_active = ? AND is_admin = ?', 
+                    [true, false], 
+                    (err, result) => {
+                        if (err) {
+                            console.error('❌ Error contando usuarios:', err);
+                            resolve(0);
+                        } else {
+                            resolve(result.count || 0);
+                        }
+                    }
+                );
+            }),
+            
+            // Obtener torneo activo y contar sus partidos
+            new Promise((resolve) => {
+                db.get('SELECT id FROM tournaments WHERE status = ?', ['active'], (err, tournament) => {
+                    if (err || !tournament) {
+                        console.log('⚠️ No hay torneo activo');
+                        resolve(0);
+                    } else {
+                        // Contar partidos del torneo activo
+                        db.get('SELECT COUNT(*) as count FROM matches_new WHERE tournament_id = ?', 
+                            [tournament.id], 
+                            (err2, matchResult) => {
+                                if (err2) {
+                                    console.error('❌ Error contando partidos:', err2);
+                                    resolve(0);
+                                } else {
+                                    resolve(matchResult.count || 0);
+                                }
+                            }
+                        );
+                    }
+                });
+            })
+        ];
+        
+        const [activeUsers, totalMatches] = await Promise.all(statsPromises);
+        
+        console.log(`✅ Estadísticas: ${activeUsers} usuarios activos, ${totalMatches} partidos`);
+        
+        res.json({
+            success: true,
+            data: {
+                active_participants: activeUsers,
+                total_matches: totalMatches,
+                last_updated: new Date().toISOString()
+            }
+        });
+        
+    } catch (error) {
+        console.error('❌ Error obteniendo estadísticas públicas:', error);
+        res.json({
+            success: false,
+            data: {
+                active_participants: 0,
+                total_matches: 0,
+                last_updated: new Date().toISOString()
+            }
+        });
+    }
+});
+
+
 // Iniciar el servidor
 app.listen(PORT, () => {
     console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);

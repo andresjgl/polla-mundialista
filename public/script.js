@@ -15,23 +15,81 @@ function goToLogin() {
 
 
 // Función para cargar información de la quiniela
+// En script.js, reemplaza la función loadQuinielaInfo:
+
+// Función para cargar información de la quiniela - VERSIÓN MEJORADA
 async function loadQuinielaInfo() {
     try {
-        const response = await fetch(`${API_BASE}/api/info`);
-        const data = await response.json();
+        console.log('📊 Cargando estadísticas de la quiniela...');
         
-        // Actualizar el número de participantes
-        const participantesElement = document.getElementById('participantes');
-        if (participantesElement) {
-            participantesElement.textContent = data.participantes || 0;
+        const response = await fetch(`${API_BASE}/api/public/stats`);
+        const result = await response.json();
+        
+        if (result.success && result.data) {
+            // Actualizar participantes
+            const participantesElement = document.getElementById('participantes');
+            if (participantesElement) {
+                // Animación de conteo
+                animateNumber(participantesElement, 0, result.data.active_participants, 1000);
+            }
+            
+            // ✅ NUEVO: Actualizar partidos
+            const partidosElement = document.getElementById('partidos');
+            if (partidosElement) {
+                // Animación de conteo
+                animateNumber(partidosElement, 0, result.data.total_matches, 1200);
+            }
+            
+            console.log('✅ Estadísticas cargadas:', result.data);
+            
+        } else {
+            console.warn('⚠️ No se pudieron cargar las estadísticas completas');
+            // Mantener valores por defecto
+            updateElement('participantes', '0');
+            updateElement('partidos', '0');
         }
         
-        console.log('Información de la quiniela cargada:', data);
-        
     } catch (error) {
-        console.error('Error al cargar información de la quiniela:', error);
+        console.error('❌ Error al cargar información de la quiniela:', error);
+        // En caso de error, mostrar valores por defecto
+        updateElement('participantes', '0');
+        updateElement('partidos', '0');
     }
 }
+
+// ✅ NUEVA FUNCIÓN: Animación de números
+function animateNumber(element, start, end, duration) {
+    const startTime = performance.now();
+    const difference = end - start;
+    
+    function updateNumber(currentTime) {
+        const elapsed = currentTime - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        
+        // Función de easing para suavizar la animación
+        const easeOutCubic = 1 - Math.pow(1 - progress, 3);
+        const current = Math.round(start + (difference * easeOutCubic));
+        
+        element.textContent = current;
+        
+        if (progress < 1) {
+            requestAnimationFrame(updateNumber);
+        } else {
+            element.textContent = end; // Asegurar el valor final
+        }
+    }
+    
+    requestAnimationFrame(updateNumber);
+}
+
+// ✅ NUEVA FUNCIÓN: Helper para actualizar elementos
+function updateElement(id, value) {
+    const element = document.getElementById(id);
+    if (element) {
+        element.textContent = value;
+    }
+}
+
 
 // Función para mostrar mensajes de notificación
 function showNotification(message, type = 'info') {
