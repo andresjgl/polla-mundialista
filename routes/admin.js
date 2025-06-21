@@ -1638,26 +1638,26 @@ router.post('/users/:id/reset-password', authenticateToken, requireAdmin, async 
     }
 });
 
-// GET /api/admin/users - Listar usuarios (CORREGIDA)
+// GET /api/admin/users - Listar usuarios (VERSIÓN FINAL CORREGIDA)
 router.get('/users', authenticateToken, requireAdmin, async (req, res) => {
     try {
         const { db } = require('../database');
         
-        // ✅ CONSULTA CORREGIDA - FUNCIONA CON AMBOS ESQUEMAS
+        // ✅ CONSULTA CORREGIDA - SOLO USAR is_admin
         db.all(`
             SELECT id, name, email, is_active, must_change_password, created_at
             FROM users 
-            WHERE (role = 'user' OR is_admin = false OR is_admin IS NULL)
+            WHERE is_admin = false
             AND id != ?
             ORDER BY name ASC
-        `, [req.user.id], (err, users) => {  // ✨ Excluir al admin actual
+        `, [req.user.id], (err, users) => {
             if (err) {
                 console.error('❌ Error obteniendo usuarios:', err);
                 return res.json([]);
             }
             
-            console.log(`✅ ${users?.length || 0} usuarios encontrados`);
-            console.log('📋 Usuarios:', users?.map(u => ({id: u.id, name: u.name, role: u.role || 'user'})));
+            console.log(`✅ ${users?.length || 0} usuarios no-admin encontrados`);
+            console.log('📋 Usuarios:', users?.map(u => ({id: u.id, name: u.name, admin: false})));
             res.json(users || []);
         });
     } catch (error) {
@@ -1665,6 +1665,7 @@ router.get('/users', authenticateToken, requireAdmin, async (req, res) => {
         res.json([]);
     }
 });
+
 
 
 
