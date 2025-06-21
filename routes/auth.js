@@ -8,23 +8,55 @@ const router = express.Router();
 // Clave secreta para JWT (en producción usar variable de entorno)
 const JWT_SECRET = 'tu-clave-super-secreta-cambiala-en-produccion';
 
-// Middleware para verificar token
+// ✅ DEBUGGING DE LA CONFIGURACIÓN
+console.log('🚀 === CONFIGURACIÓN AUTH ===');
+console.log('🔑 JWT_SECRET configurado:', JWT_SECRET ? 'SÍ' : 'NO');
+console.log('🔑 JWT_SECRET primeros 10 chars:', JWT_SECRET ? JWT_SECRET.substring(0, 10) : 'N/A');
+console.log('🌍 NODE_ENV:', process.env.NODE_ENV || 'development');
+console.log('🌍 Variables de entorno cargadas:', Object.keys(process.env).length);
+
+// Middleware para verificar token - VERSIÓN DEBUGGING
 const authenticateToken = (req, res, next) => {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
 
+    // ✅ DEBUGGING DETALLADO
+    console.log('🔐 === VERIFICANDO TOKEN ===');
+    console.log('📋 Headers completos:', req.headers);
+    console.log('🎫 Token recibido:', token ? `${token.substring(0, 50)}...` : 'NONE');
+    console.log('🔑 JWT_SECRET:', JWT_SECRET ? `${JWT_SECRET.substring(0, 10)}...` : 'NO CONFIGURADO');
+
     if (!token) {
+        console.log('❌ Token no encontrado en headers');
         return res.status(401).json({ error: 'Token de acceso requerido' });
     }
 
     jwt.verify(token, JWT_SECRET, (err, user) => {
         if (err) {
-            return res.status(403).json({ error: 'Token inválido' });
+            console.log('❌ ERROR VERIFICANDO TOKEN:');
+            console.log('   - Error type:', err.name);
+            console.log('   - Error message:', err.message);
+            console.log('   - JWT_SECRET usado para verificar:', JWT_SECRET ? 'CONFIGURADO' : 'NO CONFIGURADO');
+            
+            // ✅ INTENTAR DECODIFICAR SIN VERIFICAR PARA VER EL CONTENIDO
+            try {
+                const decoded = jwt.decode(token, { complete: true });
+                console.log('🔍 Token decodificado (sin verificar):');
+                console.log('   - Header:', decoded.header);
+                console.log('   - Payload:', decoded.payload);
+            } catch (decodeErr) {
+                console.log('❌ Error decodificando token:', decodeErr.message);
+            }
+            
+            return res.status(403).json({ error: 'Token inválido: ' + err.message });
         }
+        
+        console.log('✅ Token válido para usuario:', user.name, '(ID:', user.id, ')');
         req.user = user;
         next();
     });
 };
+
 
 // Middleware para verificar admin
 const requireAdmin = async (req, res, next) => {
@@ -140,6 +172,20 @@ router.post('/login', async (req, res) => {
             JWT_SECRET,
             { expiresIn: '7d' }
         );
+
+        // ✅ DEBUGGING DE GENERACIÓN
+        console.log('🎫 === GENERANDO TOKEN ===');
+        console.log('🔑 JWT_SECRET usado para generar:', JWT_SECRET ? JWT_SECRET.substring(0, 10) : 'NO CONFIGURADO');
+        console.log('✅ Token generado exitosamente');
+
+        // ✅ VERIFICAR INMEDIATAMENTE EL TOKEN GENERADO
+        jwt.verify(token, JWT_SECRET, (err, decoded) => {
+            if (err) {
+                console.error('❌ ERROR: Token recién generado es inválido:', err.message);
+            } else {
+                console.log('✅ Token recién generado es válido para:', decoded.name);
+            }
+        });
 
         // ✨ AÑADIR ESTA SECCIÓN AQUÍ - VERIFICAR CAMBIO DE CONTRASEÑA OBLIGATORIO
         if (user.must_change_password) {
