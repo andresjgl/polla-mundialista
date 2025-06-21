@@ -17,6 +17,8 @@ const PORT = process.env.PORT || 3000;
 const predictionsRoutes = require('./routes/predictions');
 const leaderboardRoutes = require('./routes/leaderboard');
 
+const notificationsRoutes = require('./routes/notifications');
+
 // Middlewares
 app.use(cors());
 app.use(express.json());
@@ -31,6 +33,7 @@ app.use('/api/matches', matchRoutes);
 app.use('/api/predictions', predictionsRoutes);
 app.use('/api/leaderboard', leaderboardRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/notifications', notificationsRoutes);
 
 // Ruta principal - servir la página de inicio
 app.get('/', (req, res) => {
