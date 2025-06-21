@@ -22,34 +22,33 @@ const authenticateToken = (req, res, next) => {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
 
-    // ✅ DEBUGGING DETALLADO
-    console.log('🔐 === VERIFICANDO TOKEN ===');
-    console.log('📋 Headers completos:', req.headers);
-    console.log('🎫 Token recibido:', token ? `${token.substring(0, 50)}...` : 'NONE');
-    console.log('🔑 JWT_SECRET:', JWT_SECRET ? `${JWT_SECRET.substring(0, 10)}...` : 'NO CONFIGURADO');
-
+    // ✅ DEBUGGING TEMPORAL CRÍTICO
+    console.log('🔍 === DEBUGGING JWT ===');
+    console.log('📋 Headers completos:', JSON.stringify(req.headers, null, 2));
+    console.log('🎫 Auth header:', authHeader);
+    console.log('🎫 Token extraído:', token ? `${token.substring(0, 50)}...` : 'NONE');
+    console.log('🔑 JWT_SECRET actual:', process.env.JWT_SECRET ? `${process.env.JWT_SECRET.substring(0, 10)}...` : 'NO CONFIGURADO');
+    
     if (!token) {
         console.log('❌ Token no encontrado en headers');
         return res.status(401).json({ error: 'Token de acceso requerido' });
     }
 
-    jwt.verify(token, JWT_SECRET, (err, user) => {
+    // ✅ INTENTAR DECODIFICAR SIN VERIFICAR PRIMERO
+    try {
+        const decoded = jwt.decode(token, { complete: true });
+        console.log('🔍 Token decodificado (header):', decoded.header);
+        console.log('🔍 Token decodificado (payload):', decoded.payload);
+    } catch (decodeErr) {
+        console.log('❌ Error decodificando token:', decodeErr.message);
+    }
+
+    jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
         if (err) {
             console.log('❌ ERROR VERIFICANDO TOKEN:');
             console.log('   - Error type:', err.name);
             console.log('   - Error message:', err.message);
-            console.log('   - JWT_SECRET usado para verificar:', JWT_SECRET ? 'CONFIGURADO' : 'NO CONFIGURADO');
-            
-            // ✅ INTENTAR DECODIFICAR SIN VERIFICAR PARA VER EL CONTENIDO
-            try {
-                const decoded = jwt.decode(token, { complete: true });
-                console.log('🔍 Token decodificado (sin verificar):');
-                console.log('   - Header:', decoded.header);
-                console.log('   - Payload:', decoded.payload);
-            } catch (decodeErr) {
-                console.log('❌ Error decodificando token:', decodeErr.message);
-            }
-            
+            console.log('   - JWT_SECRET usado:', process.env.JWT_SECRET ? 'CONFIGURADO' : 'NO CONFIGURADO');
             return res.status(403).json({ error: 'Token inválido: ' + err.message });
         }
         
@@ -58,6 +57,22 @@ const authenticateToken = (req, res, next) => {
         next();
     });
 };
+
+// GET /api/auth/debug-token - ENDPOINT TEMPORAL DE DEBUGGING
+router.get('/debug-token', (req, res) => {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+    
+    res.json({
+        authHeader: authHeader,
+        tokenPresent: !!token,
+        tokenPreview: token ? `${token.substring(0, 20)}...` : null,
+        jwtSecretConfigured: !!process.env.JWT_SECRET,
+        jwtSecretPreview: process.env.JWT_SECRET ? `${process.env.JWT_SECRET.substring(0, 10)}...` : null,
+        headers: req.headers
+    });
+});
+
 
 
 // Middleware para verificar admin - VERSIÓN SERVERLESS OPTIMIZADA
