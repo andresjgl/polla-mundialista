@@ -503,20 +503,26 @@ function startNotificationsPolling() {
 
 
 // --- FUNCIÓN DE UTILIDAD (¡AHORA DEFINIDA!) ---
-// Función fetchWithAuth mejorada - MENOS AGRESIVA
+// En dashboard.js, mejora fetchWithAuth:
 async function fetchWithAuth(url, options = {}) {
     const token = localStorage.getItem('token');
     
     if (!token) {
         console.warn('⚠️ No hay token, pero no redirigiendo automáticamente');
-        return null; // En lugar de redirigir inmediatamente
+        return null;
     }
+
+    // ✅ MEJORA: Configurar headers por defecto más completos
+    const defaultHeaders = {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'  // ← AGREGAR POR DEFECTO
+    };
 
     const config = {
         ...options,
         headers: {
-            'Authorization': `Bearer ${token}`,
-            ...options.headers
+            ...defaultHeaders,
+            ...options.headers  // Los headers específicos sobrescriben los por defecto
         }
     };
 
@@ -539,9 +545,10 @@ async function fetchWithAuth(url, options = {}) {
         return response;
     } catch (error) {
         console.error('❌ Error en fetchWithAuth:', error);
-        return null; // No redirigir por errores de red
+        return null;
     }
 }
+
 
 
 // --- FUNCIONES DE CARGA Y VISUALIZACIÓN ---
@@ -1454,6 +1461,7 @@ window.closePredictionModal = function() {
 }
 
 // En dashboard.js, reemplaza submitPrediction:
+// En dashboard.js, reemplaza submitPrediction:
 window.submitPrediction = async function(event, matchId) {
     event.preventDefault();
     
@@ -1477,19 +1485,21 @@ window.submitPrediction = async function(event, matchId) {
         submitButton.disabled = true;
         submitButton.textContent = 'Guardando...';
 
-        console.log('🎯 Enviando predicción:', {
+        const payload = {
             match_id: matchId,
             predicted_home_score: parseInt(homeScore),
             predicted_away_score: parseInt(awayScore)
-        });
+        };
 
+        console.log('🎯 Enviando predicción:', payload);
+
+        // ✅ CORRECCIÓN: Agregar explícitamente Content-Type
         const response = await fetchWithAuth('/api/predictions', {
             method: 'POST',
-            body: JSON.stringify({
-                match_id: matchId,
-                predicted_home_score: parseInt(homeScore),
-                predicted_away_score: parseInt(awayScore)
-            })
+            headers: {
+                'Content-Type': 'application/json'  // ← ESTA ERA LA LÍNEA FALTANTE
+            },
+            body: JSON.stringify(payload)
         });
 
         if (!response) {
@@ -1503,8 +1513,10 @@ window.submitPrediction = async function(event, matchId) {
         if (response.ok) {
             alert('¡Predicción guardada exitosamente!');
             closePredictionModal();
-            await loadUpcomingMatches(); // Recarga partidos
-            await loadUserPredictions(); // Recarga predicciones
+            
+            // Recargar datos con paginación actual
+            await loadUpcomingMatches(currentPage, currentFilter);
+            await loadUserPredictions(currentPredictionsPage, currentPredictionsFilter);
         } else {
             console.error('❌ Error del servidor:', responseData);
             alert(`Error: ${responseData.error || 'Error desconocido'}`);
@@ -1518,6 +1530,7 @@ window.submitPrediction = async function(event, matchId) {
         submitButton.textContent = 'Guardar';
     }
 }
+
 
 
 // --- PEGA ESTAS FUNCIONES AL FINAL DE public/dashboard.js ---
