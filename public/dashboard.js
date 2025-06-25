@@ -1430,30 +1430,167 @@ window.logout = function() {
     window.location.href = '/index.html';
 }
 
-window.showPredictionForm = function(matchId, homeTeam, awayTeam, homeScore, awayScore) {
-    closePredictionModal(); // Cierra cualquier modal abierto
+window.showPredictionForm = async function(matchId, homeTeam, awayTeam, homeScore, awayScore) {
+    closePredictionModal();
+    
+    try {
+        // 🔍 Obtener información del partido para verificar si es eliminatoria
+        const response = await fetchWithAuth(`/api/matches/upcoming?page=1&limit=1000`);
+        let isEliminatory = false;
+        let phaseName = '';
+        
+        if (response && response.ok) {
+            const data = await response.json();
+            const match = data.matches?.find(m => m.id === matchId);
+            if (match) {
+                isEliminatory = match.is_eliminatory;
+                phaseName = match.phase_name || '';
+                console.log(`🏆 Partido ${matchId}: ${phaseName} - Eliminatoria: ${isEliminatory}`);
+            }
+        }
+        
+        const modal = document.createElement('div');
+        modal.className = 'prediction-modal';
+        modal.innerHTML = `
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Hacer Predicción</h3>
+                    <button class="close-modal" onclick="closePredictionModal()">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="match-title">
+                        <strong>${homeTeam} vs ${awayTeam}</strong>
+                        ${phaseName ? `<small>📋 ${phaseName}</small>` : ''}
+                        ${isEliminatory ? '<span class="eliminatory-badge-modal">🏆 ELIMINATORIA</span>' : ''}
+                    </div>
+                    
+                    ${isEliminatory ? `
+                        <div class="eliminatory-notice">
+                            <h4>⚠️ Fase Eliminatoria</h4>
+                            <p>Si predices empate, debes seleccionar quién avanza a la siguiente ronda.</p>
+                        </div>
+                    ` : ''}
+                    
+                    <form id="predictionForm" onsubmit="submitPrediction(event, '${matchId}', ${isEliminatory})">
+                        <div class="score-section">
+                            <h4>Resultado en 90 minutos:</h4>
+                            <div class="score-inputs">
+                                <div class="score-input">
+                                    <label>${homeTeam}</label>
+                                    <input type="number" name="homeScore" min="0" max="20" value="${homeScore !== 'null' ? homeScore : 0}" required>
+                                </div>
+                                <div class="score-separator">-</div>
+                                <div class="score-input">
+                                    <label>${awayTeam}</label>
+                                    <input type="number" name="awayScore" min="0" max="20" value="${awayScore !== 'null' ? awayScore : 0}" required>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        ${isEliminatory ? `
+                            <div id="advanceSection" class="advance-section">
+                                <h4>🏆 ¿Quién avanza a la siguiente ronda?</h4>
+                                <div class="advance-options">
+                                    <label class="radio-option">
+                                        <input type="radio" name="teamAdvances" value="home">
+                                        <span>${homeTeam}</span>
+                                    </label>
+                                    <label class="radio-option">
+                                        <input type="radio" name="teamAdvances" value="away">
+                                        <span>${awayTeam}</span>
+                                    </label>
+                                </div>
+                            </div>
+                        ` : ''}
+                        
+                        <div class="validation-message" id="validationMessage" style="display: none;"></div>
+                        
+                        <div class="modal-actions">
+                            <button type="button" class="btn btn-secondary" onclick="closePredictionModal()">Cancelar</button>
+                            <button type="submit" class="btn btn-primary" id="submitButton">Guardar</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+
+        // 🔄 Lógica para mostrar/ocultar selector de avance
+        if (isEliminatory) {
+            const homeScoreInput = modal.querySelector('input[name="homeScore"]');
+            const awayScoreInput = modal.querySelector('input[name="awayScore"]');
+            const advanceSection = modal.querySelector('#advanceSection');
+            const validationMessage = modal.querySelector('#validationMessage');
+            const advanceOptions = modal.querySelectorAll('input[name="teamAdvances"]');
+
+            function checkForDraw() {
+                const homeScore = parseInt(homeScoreInput.value);
+                const awayScore = parseInt(awayScoreInput.value);
+
+                if (homeScore === awayScore) {
+                    advanceSection.style.display = 'block';
+                    validationMessage.style.display = 'block';
+                    validationMessage.className = 'validation-message warning';
+                    validationMessage.textContent = '⚠️ Empate en fase eliminatoria. Selecciona quién avanza.';
+                    advanceOptions.forEach(opt => opt.required = true);
+                } else {
+                    advanceSection.style.display = 'none';
+                    validationMessage.style.display = 'none';
+                    advanceOptions.forEach(opt => {
+                        opt.required = false;
+                        opt.checked = false;
+                    });
+                }
+            }
+
+            homeScoreInput.addEventListener('input', checkForDraw);
+            awayScoreInput.addEventListener('input', checkForDraw);
+            checkForDraw(); // Verificar al cargar
+        }
+        
+    } catch (error) {
+        console.error('❌ Error cargando información del partido:', error);
+        // Fallback al formulario básico existente
+        showBasicPredictionForm(matchId, homeTeam, awayTeam, homeScore, awayScore);
+    }
+}
+
+// Función fallback para casos de error
+function showBasicPredictionForm(matchId, homeTeam, awayTeam, homeScore, awayScore) {
     const modal = document.createElement('div');
     modal.className = 'prediction-modal';
     modal.innerHTML = `
-    <div class="modal-content">
-        <div class="modal-header"><h3>Hacer Predicción</h3><button class="close-modal" onclick="closePredictionModal()">&times;</button></div>
-        <div class="modal-body">
-            <div class="match-title"><strong>${homeTeam} vs ${awayTeam}</strong></div>
-            <form id="predictionForm" onsubmit="submitPrediction(event, '${matchId}')">
-                <div class="score-inputs">
-                    <div class="score-input"><label>${homeTeam}</label><input type="number" name="homeScore" min="0" max="20" value="${homeScore !== 'null' ? homeScore : 0}" required></div>
-                    <div class="score-separator">-</div>
-                    <div class="score-input"><label>${awayTeam}</label><input type="number" name="awayScore" min="0" max="20" value="${awayScore !== 'null' ? awayScore : 0}" required></div>
-                </div>
-                <div class="modal-actions">
-                    <button type="button" class="btn btn-secondary" onclick="closePredictionModal()">Cancelar</button>
-                    <button type="submit" class="btn btn-primary">Guardar</button>
-                </div>
-            </form>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Hacer Predicción</h3>
+                <button class="close-modal" onclick="closePredictionModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="match-title"><strong>${homeTeam} vs ${awayTeam}</strong></div>
+                <form id="predictionForm" onsubmit="submitPrediction(event, '${matchId}', false)">
+                    <div class="score-inputs">
+                        <div class="score-input">
+                            <label>${homeTeam}</label>
+                            <input type="number" name="homeScore" min="0" max="20" value="${homeScore !== 'null' ? homeScore : 0}" required>
+                        </div>
+                        <div class="score-separator">-</div>
+                        <div class="score-input">
+                            <label>${awayTeam}</label>
+                            <input type="number" name="awayScore" min="0" max="20" value="${awayScore !== 'null' ? awayScore : 0}" required>
+                        </div>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="btn btn-secondary" onclick="closePredictionModal()">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">Guardar</button>
+                    </div>
+                </form>
+            </div>
         </div>
-    </div>`;
+    `;
     document.body.appendChild(modal);
 }
+
 
 window.closePredictionModal = function() {
     const modal = document.querySelector('.prediction-modal');
@@ -1462,15 +1599,17 @@ window.closePredictionModal = function() {
 
 // En dashboard.js, reemplaza submitPrediction:
 // En dashboard.js, reemplaza submitPrediction:
-window.submitPrediction = async function(event, matchId) {
+
+window.submitPrediction = async function(event, matchId, isEliminatory = false) {
     event.preventDefault();
     
     const form = event.target;
-    const submitButton = form.querySelector('button[type="submit"]');
-    const homeScore = form.querySelector('input[name="homeScore"]').value;
-    const awayScore = form.querySelector('input[name="awayScore"]').value;
+    const submitButton = form.querySelector('#submitButton') || form.querySelector('button[type="submit"]');
+    const validationMessage = form.querySelector('#validationMessage');
+    const homeScore = parseInt(form.querySelector('input[name="homeScore"]').value);
+    const awayScore = parseInt(form.querySelector('input[name="awayScore"]').value);
 
-    // Validaciones del cliente
+    // Validaciones básicas
     if (homeScore < 0 || awayScore < 0) {
         alert('Los goles no pueden ser negativos');
         return;
@@ -1481,23 +1620,40 @@ window.submitPrediction = async function(event, matchId) {
         return;
     }
 
+    // 🏆 VALIDACIÓN ESPECÍFICA PARA ELIMINATORIAS
+    let teamAdvances = null;
+    if (isEliminatory && homeScore === awayScore) {
+        const advanceRadio = form.querySelector('input[name="teamAdvances"]:checked');
+        if (!advanceRadio) {
+            if (validationMessage) {
+                validationMessage.style.display = 'block';
+                validationMessage.className = 'validation-message error';
+                validationMessage.textContent = '❌ Debes seleccionar quién avanza en esta fase eliminatoria.';
+            } else {
+                alert('Debes seleccionar quién avanza en esta fase eliminatoria.');
+            }
+            return;
+        }
+        teamAdvances = advanceRadio.value;
+    }
+
     try {
         submitButton.disabled = true;
         submitButton.textContent = 'Guardando...';
 
         const payload = {
             match_id: matchId,
-            predicted_home_score: parseInt(homeScore),
-            predicted_away_score: parseInt(awayScore)
+            predicted_home_score: homeScore,
+            predicted_away_score: awayScore,
+            team_advances: teamAdvances
         };
 
         console.log('🎯 Enviando predicción:', payload);
 
-        // ✅ CORRECCIÓN: Agregar explícitamente Content-Type
         const response = await fetchWithAuth('/api/predictions', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'  // ← ESTA ERA LA LÍNEA FALTANTE
+                'Content-Type': 'application/json'
             },
             body: JSON.stringify(payload)
         });
@@ -1508,17 +1664,23 @@ window.submitPrediction = async function(event, matchId) {
         }
 
         const responseData = await response.json();
-        console.log('📊 Respuesta del servidor:', responseData);
 
         if (response.ok) {
-            alert('¡Predicción guardada exitosamente!');
+            let successMessage = '¡Predicción guardada exitosamente!';
+            if (teamAdvances) {
+                const teamNames = {
+                    home: form.querySelector('input[name="homeScore"]').closest('.score-input').querySelector('label').textContent,
+                    away: form.querySelector('input[name="awayScore"]').closest('.score-input').querySelector('label').textContent
+                };
+                successMessage += `\n🏆 Avanza: ${teamNames[teamAdvances]}`;
+            }
+            alert(successMessage);
             closePredictionModal();
             
-            // Recargar datos con paginación actual
+            // Recargar datos
             await loadUpcomingMatches(currentPage, currentFilter);
             await loadUserPredictions(currentPredictionsPage, currentPredictionsFilter);
         } else {
-            console.error('❌ Error del servidor:', responseData);
             alert(`Error: ${responseData.error || 'Error desconocido'}`);
         }
 
@@ -1530,6 +1692,7 @@ window.submitPrediction = async function(event, matchId) {
         submitButton.textContent = 'Guardar';
     }
 }
+
 
 
 

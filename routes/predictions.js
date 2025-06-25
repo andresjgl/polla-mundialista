@@ -127,21 +127,21 @@ router.get('/user', authenticateToken, async (req, res) => {
 });
 
 
-// POST /api/predictions - Crear o actualizar predicción
+// POST /api/predictions - Crear o actualizar predicción (VERSIÓN ACTUALIZADA)
 router.post('/', authenticateToken, async (req, res) => {
     const userId = req.user.id;
     const {
         match_id,
         predicted_home_score,
         predicted_away_score,
-        penalty_prediction
+        team_advances  // 🆕 NUEVO CAMPO
     } = req.body;
 
     console.log(`🎯 Nueva predicción de usuario ${userId}:`, {
         match_id,
         predicted_home_score,
         predicted_away_score,
-        penalty_prediction
+        team_advances
     });
 
     // Validaciones básicas
@@ -158,8 +158,13 @@ router.post('/', authenticateToken, async (req, res) => {
     }
 
     try {
-        // 1. Verificar que el partido existe y no ha comenzado
-        const matchQuery = 'SELECT match_date, status FROM matches_new WHERE id = ?';
+        // 1. Verificar que el partido existe y obtener información de fase
+        const matchQuery = `
+            SELECT m.match_date, m.status, tp.is_eliminatory, tp.name as phase_name
+            FROM matches_new m
+            LEFT JOIN tournament_phases tp ON m.phase_id = tp.id
+            WHERE m.id = ?
+        `;
         
         db.get(matchQuery, [match_id], (err, match) => {
             if (err) {
@@ -179,6 +184,15 @@ router.post('/', authenticateToken, async (req, res) => {
                 return res.status(403).json({ error: 'Este partido ya ha comenzado.' });
             }
 
+            // 🏆 VALIDACIÓN ELIMINATORIA
+            if (match.is_eliminatory && predicted_home_score === predicted_away_score && !team_advances) {
+                return res.status(400).json({ 
+                    error: `Esta es una fase eliminatoria (${match.phase_name}). Si hay empate, debes seleccionar quién avanza.`,
+                    is_eliminatory: true,
+                    requires_advance_selection: true
+                });
+            }
+
             // 2. Determinar ganador predicho
             let predicted_winner;
             if (predicted_home_score > predicted_away_score) {
@@ -186,7 +200,8 @@ router.post('/', authenticateToken, async (req, res) => {
             } else if (predicted_away_score > predicted_home_score) {
                 predicted_winner = 'away';
             } else {
-                predicted_winner = 'draw';
+                // Si hay empate en eliminatoria, el ganador es quien avanza
+                predicted_winner = match.is_eliminatory && team_advances ? team_advances : 'draw';
             }
 
             // 3. Verificar si ya existe una predicción
@@ -205,7 +220,7 @@ router.post('/', authenticateToken, async (req, res) => {
                         SET predicted_home_score = ?, 
                             predicted_away_score = ?, 
                             predicted_winner = ?,
-                            penalty_prediction = ?,
+                            team_advances = ?,
                             updated_at = NOW()
                         WHERE user_id = ? AND match_id = ?
                     `;
@@ -214,7 +229,7 @@ router.post('/', authenticateToken, async (req, res) => {
                         predicted_home_score,
                         predicted_away_score,
                         predicted_winner,
-                        penalty_prediction || null,
+                        team_advances || null,
                         userId,
                         match_id
                     ], function(updateErr) {
@@ -223,7 +238,7 @@ router.post('/', authenticateToken, async (req, res) => {
                             return res.status(500).json({ error: 'Error actualizando predicción.' });
                         }
 
-                        console.log(`✅ Predicción actualizada: ${predicted_home_score}-${predicted_away_score}`);
+                        console.log(`✅ Predicción actualizada: ${predicted_home_score}-${predicted_away_score}${team_advances ? ` (Avanza: ${team_advances})` : ''}`);
                         res.json({
                             message: 'Predicción actualizada exitosamente',
                             prediction: {
@@ -232,7 +247,7 @@ router.post('/', authenticateToken, async (req, res) => {
                                 predicted_home_score,
                                 predicted_away_score,
                                 predicted_winner,
-                                penalty_prediction: penalty_prediction || null
+                                team_advances: team_advances || null
                             }
                         });
                     });
@@ -242,7 +257,7 @@ router.post('/', authenticateToken, async (req, res) => {
                     const insertQuery = `
                         INSERT INTO predictions_new 
                         (user_id, match_id, predicted_home_score, predicted_away_score, 
-                         predicted_winner, penalty_prediction, created_at, updated_at)
+                         predicted_winner, team_advances, created_at, updated_at)
                         VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())
                     `;
 
@@ -252,14 +267,14 @@ router.post('/', authenticateToken, async (req, res) => {
                         predicted_home_score,
                         predicted_away_score,
                         predicted_winner,
-                        penalty_prediction || null
+                        team_advances || null
                     ], function(insertErr) {
                         if (insertErr) {
                             console.error('❌ Error creando predicción:', insertErr);
                             return res.status(500).json({ error: 'Error creando predicción.' });
                         }
 
-                        console.log(`✅ Nueva predicción creada: ${predicted_home_score}-${predicted_away_score}`);
+                        console.log(`✅ Nueva predicción creada: ${predicted_home_score}-${predicted_away_score}${team_advances ? ` (Avanza: ${team_advances})` : ''}`);
                         res.status(201).json({
                             message: 'Predicción creada exitosamente',
                             prediction: {
@@ -268,7 +283,7 @@ router.post('/', authenticateToken, async (req, res) => {
                                 predicted_home_score,
                                 predicted_away_score,
                                 predicted_winner,
-                                penalty_prediction: penalty_prediction || null
+                                team_advances: team_advances || null
                             }
                         });
                     });
@@ -281,6 +296,7 @@ router.post('/', authenticateToken, async (req, res) => {
         res.status(500).json({ error: 'Error interno del servidor.' });
     }
 });
+
 
 // GET /api/predictions/match/:matchId - Ver predicciones de un partido específico
 router.get('/match/:matchId', authenticateToken, async (req, res) => {
