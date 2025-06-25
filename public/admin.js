@@ -1186,7 +1186,7 @@ async function updateMatchResult(matchId, homeTeam, awayTeam) {
                         <div class="eliminatory-notice">
                             <h4>⚠️ Fase Eliminatoria Detectada</h4>
                             <p>Esta es una fase eliminatoria. Si el resultado es empate en 90 minutos, 
-                            deberás especificar quién ganó en penaltis.</p>
+                            deberás especificar quién ganó en penaltis o alargue.</p>
                         </div>
                     ` : ''}
                     
@@ -1207,9 +1207,9 @@ async function updateMatchResult(matchId, homeTeam, awayTeam) {
                         </div>
                         
                         ${isEliminatory ? `
-                            <div id="penaltySection" class="penalty-section" style="display: none;">
-                                <h4>🥅 Ganador en penaltis:</h4>
-                                <div class="penalty-winner-options">
+                            <div id="penaltySection" class="advance-section" style="display: none;">
+                                <h4>🥅 ¿Quién ganó en penaltis/alargue?</h4>
+                                <div class="advance-options">
                                     <label class="radio-option">
                                         <input type="radio" name="penaltyWinner" value="home">
                                         <span>${homeTeam}</span>
@@ -1278,7 +1278,8 @@ async function updateMatchResult(matchId, homeTeam, awayTeam) {
 }
 
 
-// Función mejorada para enviar resultado
+
+// Función mejorada para enviar resultado (NUEVA)
 async function submitMatchResult(event, matchId, isEliminatory = false) {
     event.preventDefault();
 
@@ -1292,7 +1293,7 @@ async function submitMatchResult(event, matchId, isEliminatory = false) {
         away_score: parseInt(formData.get('awayScore'))
     };
 
-    // Agregar ganador de penaltis si es necesario
+    // ✅ VALIDACIÓN PARA ELIMINATORIAS
     if (isEliminatory && result.home_score === result.away_score) {
         const penaltyWinner = formData.get('penaltyWinner');
         if (!penaltyWinner) {
@@ -1321,20 +1322,23 @@ async function submitMatchResult(event, matchId, isEliminatory = false) {
         const responseData = await response.json();
 
         if (response.ok) {
-            let successMessage = `¡Resultado actualizado!\n\n`;
-            successMessage += `${responseData.score}\n`;
+            let successMessage = `¡Resultado actualizado!\\n\\n`;
+            successMessage += `${responseData.score}\\n`;
             if (responseData.penalty_winner) {
-                successMessage += `Ganador en penaltis: ${responseData.penalty_winner}\n`;
+                const winnerName = responseData.penalty_winner === 'home' ? 
+                    form.querySelector('input[name="homeScore"]').closest('.score-input').querySelector('label').textContent :
+                    form.querySelector('input[name="awayScore"]').closest('.score-input').querySelector('label').textContent;
+                successMessage += `🏆 Ganador en penaltis: ${winnerName}\\n`;
             }
-            successMessage += `\n${responseData.predictions_updated} predicciones procesadas.`;
+            successMessage += `\\n${responseData.predictions_updated} predicciones procesadas.`;
 
             if (responseData.phase_info) {
-                successMessage += `\nFase: ${responseData.phase_info.name}`;
+                successMessage += `\\nFase: ${responseData.phase_info.name}`;
             }
 
             alert(successMessage);
             closeModal();
-            await loadMatches();
+            await loadMatches(currentPage); // Recargar página actual
         } else {
             validationMessage.style.display = 'block';
             validationMessage.className = 'validation-message error';
@@ -1358,6 +1362,7 @@ async function submitMatchResult(event, matchId, isEliminatory = false) {
         submitButton.textContent = 'Actualizar Resultado';
     }
 }
+
 
 
 // ============= FUNCIONES AUXILIARES =============
