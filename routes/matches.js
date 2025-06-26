@@ -255,16 +255,18 @@ router.post('/:matchId/result', authenticateToken, requireAdmin, async (req, res
 
                 console.log(`✅ Resultado actualizado: ${match.home_team} ${home_score}-${away_score} ${match.away_team}`);
 
-                // ✅ USAR EL SISTEMA DE PUNTOS EXISTENTE
+                // ✅ CORRECCIÓN - Pasar penalty_winner como cuarto parámetro
                 try {
                     const { pointsCalculator } = require('../database');
                     const pointsResult = await pointsCalculator.updateMatchPredictions(
                         matchId, 
                         home_score, 
-                        away_score
+                        away_score,
+                        penalty_winner  // 🆕 AÑADIR ESTE PARÁMETRO
                     );
                     
                     console.log(`🎯 Puntos calculados: ${pointsResult.updated} predicciones actualizadas`);
+
 
                     // 🔔 ✨ AÑADIR NOTIFICACIONES AQUÍ (NUEVA LÍNEA)
                     try {
