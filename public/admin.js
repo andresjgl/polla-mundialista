@@ -869,7 +869,8 @@ function displayMatches(matches, pagination) {
     matches.forEach(match => {
         // MANEJO DEFENSIVO DE VALORES UNDEFINED/NULL
         const phaseName = match.phase_name || 'Sin fase';
-        const pointsMultiplier = match.points_multiplier || 1;
+        const resultPoints = match.result_points || 1;          
+        const exactScorePoints = match.exact_score_points || 3; 
         const predictionsCount = match.predictions_count || 0;
         const tournamentName = match.tournament_name || 'Sin torneo';
         
@@ -901,7 +902,7 @@ function displayMatches(matches, pagination) {
                             <strong>${match.home_team || 'Equipo Local'} vs ${match.away_team || 'Equipo Visitante'}</strong>
                         </div>
                         <small class="match-details">
-                            📋 ${phaseName} (${pointsMultiplier}x puntos) - ${tournamentName}
+                            📋 ${phaseName} (${resultPoints} pts) - ${tournamentName}
                         </small>
                     </div>
                     
@@ -1176,7 +1177,7 @@ async function updateMatchResult(matchId, homeTeam, awayTeam) {
                 <div class="modal-body">
                     <div class="match-title">
                         <strong>${homeTeam} vs ${awayTeam}</strong>
-                        ${match ? `<small>📋 Fase: ${match.phase_name} (${match.points_multiplier}x puntos)</small>` : ''}
+                        ${match ? `<small>📋 Fase: ${match.phase_name} (${match.result_points || 1} pts resultado, ${match.exact_score_points || 3} pts exacto)</small>` : ''}
                         ${isEliminatory ? '<span class="eliminatory-badge-modal">🏆 ELIMINATORIA</span>' : ''}
                     </div>
                     
@@ -2096,7 +2097,7 @@ async function loadTournamentPhases() {
             const phases = await response.json();
             phases.forEach(phase => {
                 phaseSelect.innerHTML += `
-                    <option value="${phase.id}">${phase.name} (${phase.points_multiplier}x puntos)</option>
+                    <option value="${phase.id}">${phase.name} (${phase.result_points || 1} pts)</option>
                 `;
             });
         } else {

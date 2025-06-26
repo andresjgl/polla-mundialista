@@ -385,13 +385,16 @@ router.get('/with-predictions', authenticateToken, requireAdmin, async (req, res
                 t.name as tournament_name,
                 tp.name as phase_name,
                 tp.is_eliminatory,
+                tp.result_points,        -- 🆕 AGREGAR ESTA LÍNEA
+                tp.exact_score_points,   -- 🆕 AGREGAR ESTA LÍNEA
+                tp.points_multiplier,    -- Mantener por compatibilidad
                 COUNT(p.id) as predictions_count
             FROM matches_new m
             LEFT JOIN tournaments t ON m.tournament_id = t.id
             LEFT JOIN tournament_phases tp ON m.phase_id = tp.id
             LEFT JOIN predictions_new p ON m.id = p.match_id
             ${whereClause}
-            GROUP BY m.id, t.name, tp.name, tp.is_eliminatory
+            GROUP BY m.id, t.name, tp.name, tp.is_eliminatory, tp.result_points, tp.exact_score_points, tp.points_multiplier
             ORDER BY m.match_date ASC, m.id ASC
             LIMIT ? OFFSET ?
         `;
@@ -552,6 +555,8 @@ router.get('/:matchId/info', authenticateToken, requireAdmin, async (req, res) =
                 tp.name as phase_name,
                 tp.is_eliminatory,
                 tp.points_multiplier,
+                tp.result_points,        -- 🆕 AGREGAR ESTA LÍNEA
+                tp.exact_score_points,   -- 🆕 AGREGAR ESTA LÍNEA
                 t.name as tournament_name
             FROM matches_new m
             LEFT JOIN tournament_phases tp ON m.phase_id = tp.id
