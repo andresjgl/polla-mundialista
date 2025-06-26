@@ -1139,49 +1139,31 @@ function getMatchStatusText(status) {
 
 async function updateMatchResult(matchId, homeTeam, awayTeam) {
     try {
-        // Primero verificar si es fase eliminatoria
+        console.log(`🔍 Obteniendo información del partido: ${matchId}`);
+        
+        // Usar endpoint específico para obtener información del partido
         const token = localStorage.getItem('token');
-        const matchResponse = await fetch(`/api/matches/with-predictions`, {
+        const response = await fetch(`/api/matches/${matchId}/info`, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
 
-        const data = await matchResponse.json();
+        let match = null;
+        let isEliminatory = false;
         
-        // ✅ CORRECCIÓN: Manejo correcto de la respuesta paginada
-        const matches = data.matches || data || [];
-        
-        if (!Array.isArray(matches)) {
-            console.error('❌ Error: La respuesta no contiene un array de partidos válido');
-            throw new Error('Formato de respuesta inválido');
+        if (response.ok) {
+            const data = await response.json();
+            match = data.match;
+            isEliminatory = data.is_eliminatory;
+            
+            console.log('✅ Información del partido obtenida:', {
+                matchId,
+                phase_name: match?.phase_name,
+                is_eliminatory: isEliminatory,
+                backend_is_eliminatory: match?.is_eliminatory
+            });
+        } else {
+            console.warn('⚠️ No se pudo obtener información del partido, continuando sin datos de fase');
         }
-        
-        const match = matches.find(m => m.id === matchId);
-        
-        if (!match) {
-            console.warn('⚠️ Partido no encontrado en la respuesta, continuando sin información de fase');
-        }
-        
-        // ✅ POR ESTA (más robusta):
-        const isEliminatory = match && (
-            match.is_eliminatory === true || 
-            match.is_eliminatory === 1 ||
-            (match.phase_name && (
-                match.phase_name.toLowerCase().includes('final') ||
-                match.phase_name.toLowerCase().includes('octavo') ||
-                match.phase_name.toLowerCase().includes('cuarto') ||
-                match.phase_name.toLowerCase().includes('semi')
-            ))
-        );
-
-        // Después de encontrar el match, agrega esto para debugging:
-        console.log('🔍 DEBUGGING MATCH:', {
-            matchId,
-            found: !!match,
-            phase_name: match?.phase_name,
-            is_eliminatory: match?.is_eliminatory,
-            calculated_isEliminatory: isEliminatory
-        });
-
 
         const modal = document.createElement('div');
         modal.className = 'prediction-modal';
@@ -1194,8 +1176,8 @@ async function updateMatchResult(matchId, homeTeam, awayTeam) {
                 <div class="modal-body">
                     <div class="match-title">
                         <strong>${homeTeam} vs ${awayTeam}</strong>
-                        ${match ? `<small>Fase: ${match.phase_name} (${match.points_multiplier}x puntos)</small>` : ''}
-                        ${isEliminatory ? '<span class="eliminatory-badge-modal">ELIMINATORIA</span>' : ''}
+                        ${match ? `<small>📋 Fase: ${match.phase_name} (${match.points_multiplier}x puntos)</small>` : ''}
+                        ${isEliminatory ? '<span class="eliminatory-badge-modal">🏆 ELIMINATORIA</span>' : ''}
                     </div>
                     
                     ${isEliminatory ? `
@@ -1267,13 +1249,17 @@ async function updateMatchResult(matchId, homeTeam, awayTeam) {
                 const homeScore = parseInt(homeScoreInput.value);
                 const awayScore = parseInt(awayScoreInput.value);
 
+                console.log(`🔄 Verificando empate: ${homeScore} vs ${awayScore}`);
+
                 if (homeScore === awayScore) {
+                    console.log('⚠️ Empate detectado, mostrando sección de penaltis');
                     penaltySection.style.display = 'block';
                     validationMessage.style.display = 'block';
                     validationMessage.className = 'validation-message warning';
                     validationMessage.textContent = '⚠️ Empate detectado en fase eliminatoria. Selecciona el ganador en penaltis.';
                     penaltyOptions.forEach(opt => opt.required = true);
                 } else {
+                    console.log('✅ No hay empate, ocultando sección de penaltis');
                     penaltySection.style.display = 'none';
                     validationMessage.style.display = 'none';
                     penaltyOptions.forEach(opt => {
@@ -1285,14 +1271,16 @@ async function updateMatchResult(matchId, homeTeam, awayTeam) {
 
             homeScoreInput.addEventListener('input', checkForDraw);
             awayScoreInput.addEventListener('input', checkForDraw);
+            
+            // Verificar inmediatamente al cargar
+            checkForDraw();
         }
 
     } catch (error) {
-        console.error('Error preparando formulario de resultado:', error);
+        console.error('❌ Error preparando formulario de resultado:', error);
         alert('Error cargando información del partido: ' + error.message);
     }
 }
-
 
 
 // Función mejorada para enviar resultado (NUEVA)

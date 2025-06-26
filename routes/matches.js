@@ -536,6 +536,54 @@ router.get('/debug', authenticateToken, async (req, res) => {
     }
 });
 
+// GET /api/matches/:matchId/info - Obtener información específica de un partido
+router.get('/:matchId/info', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const { matchId } = req.params;
+        const { db } = require('../database');
+        
+        console.log(`🔍 Obteniendo info del partido: ${matchId}`);
+        
+        const query = `
+            SELECT 
+                m.*,
+                tp.name as phase_name,
+                tp.is_eliminatory,
+                tp.points_multiplier,
+                t.name as tournament_name
+            FROM matches_new m
+            LEFT JOIN tournament_phases tp ON m.phase_id = tp.id
+            LEFT JOIN tournaments t ON m.tournament_id = t.id
+            WHERE m.id = ?
+        `;
+        
+        db.get(query, [matchId], (err, match) => {
+            if (err) {
+                console.error('❌ Error obteniendo partido:', err);
+                return res.status(500).json({ error: 'Error interno del servidor' });
+            }
+            
+            if (!match) {
+                return res.status(404).json({ error: 'Partido no encontrado' });
+            }
+            
+            console.log('✅ Partido encontrado:', {
+                id: match.id,
+                phase_name: match.phase_name,
+                is_eliminatory: match.is_eliminatory
+            });
+            
+            res.json({
+                match,
+                is_eliminatory: match.is_eliminatory === 1 || match.is_eliminatory === true
+            });
+        });
+        
+    } catch (error) {
+        console.error('❌ Error en endpoint de info:', error);
+        res.status(500).json({ error: 'Error interno del servidor' });
+    }
+});
 
 
 
