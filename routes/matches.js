@@ -213,12 +213,13 @@ router.post('/:matchId/result', authenticateToken, requireAdmin, async (req, res
             // Validar fase eliminatoria
             if (match.is_eliminatory && home_score === away_score && !penalty_winner) {
                 return res.status(400).json({
-                    error: `Esta es una fase eliminatoria (${match.phase_name}). No se permiten empates.`,
-                    suggestion: 'Debe definirse un ganador. Si hubo empate en 90 minutos, ingresa el resultado después de penaltis.',
+                    error: `Empate en fase eliminatoria detectado. Debes especificar quién ganó en penaltis.`,
                     requires_penalty_winner: true,
-                    is_eliminatory: true
+                    is_eliminatory: true,
+                    phase_name: match.phase_name
                 });
             }
+
 
             // Determinar ganador
             let winner = 'draw';

@@ -3606,3 +3606,14 @@ main {
         justify-content: center;
     }
 }
+
+/* AGREGAR TEMPORALMENTE AL FINAL DE styles.css */
+#penaltySection {
+    border: 2px solid red !important;
+    background: yellow !important;
+}
+
+#penaltySection[style*="display: block"] {
+    border: 2px solid green !important;
+    background: lightgreen !important;
+}

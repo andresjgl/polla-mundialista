@@ -1161,11 +1161,27 @@ async function updateMatchResult(matchId, homeTeam, awayTeam) {
             console.warn('⚠️ Partido no encontrado en la respuesta, continuando sin información de fase');
         }
         
-        const isEliminatory = match && match.phase_name &&
-            (match.phase_name.toLowerCase().includes('final') ||
+        // ✅ POR ESTA (más robusta):
+        const isEliminatory = match && (
+            match.is_eliminatory === true || 
+            match.is_eliminatory === 1 ||
+            (match.phase_name && (
+                match.phase_name.toLowerCase().includes('final') ||
                 match.phase_name.toLowerCase().includes('octavo') ||
                 match.phase_name.toLowerCase().includes('cuarto') ||
-                match.phase_name.toLowerCase().includes('semi'));
+                match.phase_name.toLowerCase().includes('semi')
+            ))
+        );
+
+        // Después de encontrar el match, agrega esto para debugging:
+        console.log('🔍 DEBUGGING MATCH:', {
+            matchId,
+            found: !!match,
+            phase_name: match?.phase_name,
+            is_eliminatory: match?.is_eliminatory,
+            calculated_isEliminatory: isEliminatory
+        });
+
 
         const modal = document.createElement('div');
         modal.className = 'prediction-modal';
