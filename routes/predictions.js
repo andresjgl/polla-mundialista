@@ -329,35 +329,49 @@ router.get('/match/:matchId', authenticateToken, async (req, res) => {
             });
         }
 
-        // Obtener todas las predicciones del partido con información de usuarios
-        const predictionsQuery = `
-            SELECT 
-                p.id,
-                p.predicted_home_score,
-                p.predicted_away_score,
-                p.predicted_winner,
-                p.points_earned,
-                p.result_points,
-                p.score_points,
-                u.name as user_name,
-                u.id as user_id,
-                CASE 
-                    WHEN p.predicted_home_score = m.home_score AND p.predicted_away_score = m.away_score THEN 'exact'
-                    WHEN p.predicted_winner = (
+                // Obtener todas las predicciones del partido con información de usuarios
+                const predictionsQuery = `
+                    SELECT 
+                        p.id,
+                        p.predicted_home_score,
+                        p.predicted_away_score,
+                        p.predicted_winner,
+                        p.team_advances,
+                        p.points_earned,
+                        p.result_points,
+                        p.score_points,
+                        u.name as user_name,
+                        u.id as user_id,
                         CASE 
-                            WHEN m.home_score > m.away_score THEN 'home'
-                            WHEN m.away_score > m.home_score THEN 'away'
-                            ELSE 'draw'
-                        END
-                    ) THEN 'result'
-                    ELSE 'miss'
-                END as prediction_accuracy
-            FROM predictions_new p
-            JOIN users u ON p.user_id = u.id
-            JOIN matches_new m ON p.match_id = m.id
-            WHERE p.match_id = ? AND u.is_active = true
-            ORDER BY p.points_earned DESC, u.name ASC
-        `;
+                            WHEN p.predicted_home_score = m.home_score AND p.predicted_away_score = m.away_score THEN 'exact'
+                            WHEN p.predicted_winner = (
+                                CASE 
+                                    WHEN m.home_score > m.away_score THEN 'home'
+                                    WHEN m.away_score > m.home_score THEN 'away'
+                                    WHEN m.home_score = m.away_score THEN 
+                                        CASE 
+                                            -- 🏆 EN ELIMINATORIAS, USAR PENALTY_WINNER
+                                            WHEN tp.is_eliminatory = true AND m.penalty_winner IS NOT NULL THEN m.penalty_winner
+                                            -- 📊 EN FASES DE GRUPOS, EMPATE ES VÁLIDO
+                                            ELSE 'draw'
+                                        END
+                                    ELSE 'draw'
+                                END
+                            ) THEN 'result'
+                            -- 🆕 LÓGICA ADICIONAL PARA ELIMINATORIAS CON TEAM_ADVANCES
+                            WHEN tp.is_eliminatory = true 
+                                AND m.home_score = m.away_score 
+                                AND p.team_advances IS NOT NULL 
+                                AND p.team_advances = m.penalty_winner THEN 'result'
+                            ELSE 'miss'
+                        END as prediction_accuracy
+                    FROM predictions_new p
+                    JOIN users u ON p.user_id = u.id
+                    JOIN matches_new m ON p.match_id = m.id
+                    LEFT JOIN tournament_phases tp ON m.phase_id = tp.id
+                    WHERE p.match_id = ? AND u.is_active = true
+                    ORDER BY p.points_earned DESC, u.name ASC
+                `;
 
         const predictions = await new Promise((resolve, reject) => {
             db.all(predictionsQuery, [matchId], (err, results) => {
