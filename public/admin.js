@@ -2344,13 +2344,13 @@ function displayUsers(users) {
         <div class="user-card">
             <div class="user-info">
                 <div class="user-name">
-                    ${user.name}
+                    <strong>Nombre:</strong> ${user.name}
                     ${user.must_change_password ? '<span class="temp-password-badge">🔐 Temporal</span>' : ''}
                 </div>
-                <div class="user-email">${user.email}</div>
+                <div class="user-email"><strong>E-mail: </strong>${user.email}</div>
                 <div class="user-status">
                     <span class="status-badge ${user.is_active ? 'active' : 'inactive'}">
-                        ${user.is_active ? 'Activo' : 'Inactivo'}
+                        <strong>Estado: </strong>${user.is_active ? 'Activo' : 'Inactivo'}
                     </span>
                 </div>
             </div>

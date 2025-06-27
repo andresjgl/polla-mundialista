@@ -463,7 +463,7 @@ main {
 
 .points-number, .position-number {
     display: block;
-    font-size: 3rem;
+    font-size: 1.25rem;
     font-weight: bold;
     color: #001450;
 }
@@ -560,7 +560,6 @@ main {
     padding: 0.25rem 0.5rem;
     border-radius: 4px;
     font-size: 0.875rem;
-    background: #f7fafc;
     color: #718096;
 }
 
@@ -2430,6 +2429,15 @@ main {
     .pagination-controls {
         flex-wrap: wrap;
         justify-content: center;
+        width: 100%;
+        margin: 0;
+    }
+
+    .page-numbers {
+        gap: 1rem;
+        flex-direction: column;
+        width: 100%;
+        align-items: center;
     }
 }
 
@@ -2601,6 +2609,7 @@ main {
     
     .prediction-details {
         display: block;
+        text-align: center;
     }
 
     .prediction-score {
@@ -2616,7 +2625,7 @@ main {
     .prediction-points {
         margin: 0.5rem 0;
         padding: 0.5rem 0;
-        text-align: left;
+        text-align: center;
     }
     
     .filter-controls {
@@ -2626,6 +2635,32 @@ main {
     .filter-buttons {
         flex-wrap: wrap;
     }
+}
+
+/* ===== ESTILOS DE TAB ADMIN DE USUARIOS ===== */
+
+.users-list {
+    margin-top: 2rem;
+}
+
+/* ===== RESPONSIVE DESIGN ===== */
+@media (max-width: 768px) {
+    .user-info {
+        display: block;
+    }
+
+    .user-name {
+        margin: 0.5rem 0;
+    }
+
+    .user-email {
+        margin: 0.5rem 0;
+    }
+
+    .user-status {
+        margin: 0.5rem 0;
+    }
+
 }
 
 /* ===== COLORES POR POSICIÓN ===== */
@@ -2815,6 +2850,7 @@ main {
     .vs {
         order: 2;
         align-self: center;
+        display: none;
     }
     
     .team-name {
@@ -2861,11 +2897,9 @@ main {
 }
 
 .match-info-header {
-    background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
     border-radius: 8px;
-    padding: 1.5rem;
-    margin-bottom: 1.5rem;
-    border: 1px solid #e2e8f0;
+    padding: 1rem;
+    margin-bottom: 1rem;
 }
 
 .match-title h4 {
@@ -2890,7 +2924,7 @@ main {
 
 .stat-item {
     text-align: center;
-    padding: 1.75rem;
+    padding: 1rem;
     background: white;
     border-radius: 32px;
     border: 1px solid #e2e8f0;
@@ -2924,7 +2958,7 @@ main {
     grid-template-columns: 60px 1fr 120px 120px 80px;
     gap: 1rem;
     padding: 1rem;
-    background: #1a202c;
+    background: #001450;
     color: white;
     font-weight: 600;
     font-size: 0.875rem;
@@ -2973,11 +3007,12 @@ main {
     border-radius: 50%;
     font-weight: 700;
     font-size: 0.875rem;
-    min-width: 32px;
-    height: 32px;
+    min-width: 2rem;
+    height: 2rem;
     display: flex;
     align-items: center;
     justify-content: center;
+    margin: 0 1rem;
 }
 
 .position-number {
@@ -3048,7 +3083,7 @@ main {
 @media (max-width: 768px) {
     .table-header,
     .table-row {
-        grid-template-columns: 40px 1fr 80px 60px;
+        grid-template-columns: 30px 220px 50px;
         gap: 0.5rem;
         font-size: 0.75rem;
         padding: 0.75rem 0.5rem;
@@ -3216,6 +3251,7 @@ main {
     display: flex;
     align-items: center;
     gap: 0.5rem;
+    padding: 0 1.5rem 1.5rem 0;
 }
 
 .notifications-modal .modal-body {
