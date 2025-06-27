@@ -2138,6 +2138,29 @@ window.testPushFromServer = async function() {
     }
 }
 
+window.sendTestPush = async function() {
+    try {
+        console.log('📤 Enviando push de prueba...');
+        showTemporaryMessage('📤 Enviando notificación de prueba a todos tus dispositivos...');
+        
+        const response = await fetchWithAuth('/api/notifications/test', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        
+        if (response && response.ok) {
+            showTemporaryMessage('✅ Push enviado! Revisa tu móvil en unos segundos');
+            console.log('✅ Push enviado correctamente');
+        } else {
+            console.error('❌ Error:', await response.text());
+            showTemporaryMessage('❌ Error enviando push');
+        }
+    } catch (error) {
+        console.error('❌ Error:', error);
+        showTemporaryMessage('❌ Error de conexión');
+    }
+}
+
 
 window.closePredictionsModal = function() {
     const modal = document.querySelector('.predictions-modal');
