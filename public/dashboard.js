@@ -40,6 +40,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('userName').textContent = user.name || 'Usuario';
     
     checkAccountStatus(user);
+    checkNotificationSupport();
 
      // ✨ INICIALIZAR PUSH NOTIFICATIONS
     await registerServiceWorker();
@@ -64,6 +65,192 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 // ===== SISTEMA DE PUSH NOTIFICATIONS =====
+
+// ===== FUNCIONES MEJORADAS PARA PUSH NOTIFICATIONS =====
+
+// Verificar soporte de notificaciones
+function checkNotificationSupport() {
+    if (!('Notification' in window)) {
+        console.warn('⚠️ Este navegador no soporta notificaciones');
+        return false;
+    }
+    
+    if (!('serviceWorker' in navigator)) {
+        console.warn('⚠️ Este navegador no soporta Service Workers');
+        return false;
+    }
+    
+    if (!('PushManager' in window)) {
+        console.warn('⚠️ Este navegador no soporta Push API');
+        return false;
+    }
+    
+    // Si tiene soporte, verificar el estado actual
+    checkPushSubscription();
+    return true;
+}
+
+// Verificar si ya está suscrito
+async function checkPushSubscription() {
+    try {
+        const registration = await navigator.serviceWorker.ready;
+        const subscription = await registration.pushManager.getSubscription();
+        
+        if (subscription) {
+            console.log('✅ Usuario ya suscrito a push notifications');
+            pushSubscription = subscription;
+            updateNotificationUI(true);
+        } else {
+            console.log('⚠️ Usuario no suscrito a push notifications');
+            updateNotificationUI(false);
+            
+            // Mostrar prompt después de 1 minuto si no está suscrito
+            setTimeout(() => {
+                if (Notification.permission === 'default') {
+                    showNotificationPrompt();
+                }
+            }, 60000);
+        }
+    } catch (error) {
+        console.error('❌ Error verificando suscripción:', error);
+    }
+}
+
+// Actualizar UI según estado de notificaciones
+function updateNotificationUI(isSubscribed) {
+    const notifButton = document.getElementById('enableNotifications');
+    if (notifButton) {
+        notifButton.textContent = isSubscribed ? '🔔 Notificaciones Activas' : '🔕 Activar Notificaciones';
+        notifButton.disabled = isSubscribed;
+    }
+}
+
+// Mostrar prompt personalizado
+function showNotificationPrompt() {
+    if (document.querySelector('.notification-prompt')) return;
+    
+    const promptDiv = document.createElement('div');
+    promptDiv.className = 'notification-prompt';
+    promptDiv.innerHTML = `
+        <div class="prompt-content">
+            <div class="prompt-icon">🔔</div>
+            <div class="prompt-text">
+                <h4>¿Activar notificaciones?</h4>
+                <p>Recibe alertas cuando:</p>
+                <ul>
+                    <li>🚨 Un partido esté por comenzar</li>
+                    <li>⚽ Se actualicen resultados</li>
+                    <li>🏆 Cambies de posición</li>
+                </ul>
+            </div>
+            <div class="prompt-actions">
+                <button class="btn btn-secondary btn-small" onclick="dismissNotificationPrompt()">
+                    Más tarde
+                </button>
+                <button class="btn btn-primary btn-small" onclick="enablePushNotifications()">
+                    Activar
+                </button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(promptDiv);
+    
+    // Animación de entrada
+    setTimeout(() => {
+        promptDiv.classList.add('show');
+    }, 100);
+}
+
+// Activar notificaciones push (función mejorada)
+window.enablePushNotifications = async function() {
+    try {
+        console.log('🔔 Iniciando proceso de activación...');
+        
+        // 1. Verificar Service Worker
+        const registration = await navigator.serviceWorker.ready;
+        console.log('✅ Service Worker listo');
+        
+        // 2. Pedir permisos
+        const permission = await Notification.requestPermission();
+        console.log('📋 Permiso:', permission);
+        
+        if (permission !== 'granted') {
+            showTemporaryMessage('❌ Permiso de notificaciones denegado');
+            dismissNotificationPrompt();
+            return false;
+        }
+        
+        // 3. Crear suscripción
+        console.log('📱 Creando suscripción push...');
+        const subscription = await registration.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: urlBase64ToUint8Array(applicationServerKey)
+        });
+        
+        console.log('✅ Suscripción creada:', subscription);
+        pushSubscription = subscription;
+        
+        // 4. Enviar al servidor
+        const response = await fetchWithAuth('/api/notifications/subscribe', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                subscription: subscription.toJSON(),
+                user_agent: navigator.userAgent,
+                device_type: /Mobile|Android|iPhone|iPad/.test(navigator.userAgent) ? 'mobile' : 'desktop'
+            })
+        });
+        
+        if (response && response.ok) {
+            console.log('✅ Suscripción guardada en servidor');
+            showTemporaryMessage('✅ ¡Notificaciones activadas correctamente!');
+            updateNotificationUI(true);
+            
+            // Enviar notificación de prueba
+            testPushNotification();
+        } else {
+            throw new Error('Error guardando suscripción en servidor');
+        }
+        
+        dismissNotificationPrompt();
+        return true;
+        
+    } catch (error) {
+        console.error('❌ Error completo:', error);
+        showTemporaryMessage('❌ Error activando notificaciones: ' + error.message);
+        return false;
+    }
+}
+
+// Función para probar notificaciones
+window.testPushNotification = async function() {
+    try {
+        // Primero prueba local
+        if (Notification.permission === 'granted') {
+            new Notification('🎉 ¡Notificaciones Activadas!', {
+                body: 'Recibirás alertas de partidos y resultados',
+                icon: '/icons/icon-192x192.png',
+                badge: '/icons/icon-72x72.png',
+                vibrate: [200, 100, 200]
+            });
+        }
+        
+        // Luego prueba push del servidor
+        setTimeout(async () => {
+            const response = await fetchWithAuth('/api/notifications/test', {
+                method: 'POST'
+            });
+            
+            if (response && response.ok) {
+                console.log('✅ Notificación de prueba enviada desde servidor');
+            }
+        }, 2000);
+        
+    } catch (error) {
+        console.error('❌ Error en notificación de prueba:', error);
+    }
+}
+
 
 // ===== DETECCIÓN DE CONEXIÓN =====
 window.addEventListener('online', () => {

@@ -664,6 +664,34 @@ async function notifyMatchResultWithPush(matchId, homeScore, awayScore) {
     }
 }
 
+// POST /api/notifications/test - Enviar notificación de prueba
+router.post('/test', authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        
+        const title = '🧪 Notificación de Prueba';
+        const message = '¡Las notificaciones push están funcionando correctamente!';
+        
+        await sendPushNotification(userId, title, message, { 
+            type: 'test',
+            url: '/dashboard.html'
+        });
+        
+        res.json({ 
+            message: 'Notificación de prueba enviada',
+            success: true 
+        });
+        
+    } catch (error) {
+        console.error('❌ Error enviando notificación de prueba:', error);
+        res.status(500).json({ 
+            error: 'Error enviando notificación',
+            details: error.message 
+        });
+    }
+});
+
+
 
 // ============= EXPORTAR FUNCIONES =============
 

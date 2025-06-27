@@ -26,6 +26,10 @@
                 </div>
                 <div class="header-right">
                     <div class="notifications-container">
+                        <!-- Botón para activar notificaciones push -->
+                        <button id="enableNotifications" class="btn btn-primary btn-small" onclick="enablePushNotifications()">
+                            🔕 Activar Notificaciones
+                        </button>
                         <button class="notifications-btn" onclick="toggleNotifications()">
                             🔔
                             <span class="notifications-badge" id="notificationsBadge" style="display: none;">0</span>
