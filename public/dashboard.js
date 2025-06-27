@@ -2112,6 +2112,33 @@ function displayMatchPredictions(data) {
     `;
 }
 
+// Función para probar push del servidor
+window.testPushFromServer = async function() {
+    try {
+        showTemporaryMessage('📤 Enviando notificación de prueba...');
+        
+        const response = await fetchWithAuth('/api/notifications/test', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        
+        if (response && response.ok) {
+            const result = await response.json();
+            console.log('✅ Respuesta del servidor:', result);
+            showTemporaryMessage('✅ Notificación enviada desde el servidor');
+        } else {
+            const error = await response.text();
+            console.error('❌ Error del servidor:', error);
+            showTemporaryMessage('❌ Error enviando notificación');
+        }
+        
+    } catch (error) {
+        console.error('❌ Error:', error);
+        showTemporaryMessage('❌ Error de conexión');
+    }
+}
+
+
 window.closePredictionsModal = function() {
     const modal = document.querySelector('.predictions-modal');
     if (modal) {

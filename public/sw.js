@@ -122,55 +122,51 @@ self.addEventListener('fetch', event => {
 });
 
 // Escuchar mensajes push (tu código existente mejorado)
+// Escuchar mensajes push - VERSIÓN MEJORADA
 self.addEventListener('push', event => {
     console.log('🔔 Push notification recibida');
     
-    if (!event.data) {
-        console.warn('❌ Push notification sin datos');
-        return;
+    let data = {
+        title: '🏆 Quiniela Familiar',
+        message: 'Nueva notificación',
+        type: 'general'
+    };
+    
+    if (event.data) {
+        try {
+            // Intentar parsear como JSON
+            data = event.data.json();
+            console.log('📄 Datos del push (JSON):', data);
+        } catch (e) {
+            // Si falla, usar el texto plano
+            console.log('📄 Datos del push (texto):', event.data.text());
+            data.message = event.data.text();
+        }
     }
 
-    try {
-        const data = event.data.json();
-        console.log('📄 Datos del push:', data);
+    const options = {
+        body: data.message || 'Nueva notificación',
+        icon: '/icons/icon-192x192.png',
+        badge: '/icons/icon-72x72.png',
+        vibrate: [200, 100, 200],
+        data: {
+            url: data.url || '/dashboard.html',
+            matchId: data.matchId,
+            type: data.type || 'general'
+        },
+        requireInteraction: false,
+        tag: data.type || 'general',
+        renotify: true
+    };
 
-        const options = {
-            body: data.message,
-            icon: '/icons/icon-192x192.png',
-            badge: '/icons/icon-72x72.png',
-            vibrate: [200, 100, 200],
-            data: {
-                url: data.url || '/dashboard.html',
-                matchId: data.matchId,
-                type: data.type
-            },
-            actions: [
-                {
-                    action: 'view',
-                    title: '👀 Ver',
-                    icon: '/icons/icon-72x72.png'
-                },
-                {
-                    action: 'close',
-                    title: '❌ Cerrar',
-                    icon: '/icons/icon-72x72.png'
-                }
-            ],
-            requireInteraction: true,
-            tag: data.type || 'general',
-            renotify: true
-        };
-
-        event.waitUntil(
-            self.registration.showNotification(
-                data.title || '🏆 Quiniela Familiar',
-                options
-            )
-        );
-    } catch (error) {
-        console.error('❌ Error procesando push:', error);
-    }
+    event.waitUntil(
+        self.registration.showNotification(
+            data.title || '🏆 Quiniela Familiar',
+            options
+        )
+    );
 });
+
 
 // Manejar clicks en notificaciones (tu código existente)
 self.addEventListener('notificationclick', event => {
