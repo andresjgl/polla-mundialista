@@ -40,7 +40,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('userName').textContent = user.name || 'Usuario';
     
     checkAccountStatus(user);
-    checkNotificationSupport();
 
      // ✨ INICIALIZAR PUSH NOTIFICATIONS
     await registerServiceWorker();
