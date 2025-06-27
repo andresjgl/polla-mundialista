@@ -29,9 +29,6 @@
                 </div>
                 <div class="header-right">
                     <div class="notifications-container">
-                        <button id="enableNotifications" class="btn btn-primary btn-small" onclick="enablePushNotifications()">
-                            🔕 Activar Notificaciones
-                        </button>
                         <button class="notifications-btn" onclick="toggleNotifications()">
                             🔔
                             <span class="notifications-badge" id="notificationsBadge" style="display: none;">0</span>
@@ -39,22 +36,6 @@
                         <!-- Agregar en el header-right, después del botón de notificaciones -->
                         <button id="installButton" class="btn btn-primary btn-small" style="display: none;" onclick="installPWA()">
                             📱 Instalar App
-                        </button>
-                    </div>
-                    <!-- BOTONES TEMPORALES PARA DEBUG iOS -->
-                    <div style="position: fixed; bottom: 20px; left: 20px; z-index: 9999; background: white; padding: 10px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.2);">
-                        <h4>🧪 Debug iOS</h4>
-                        
-                        <button onclick="checkIOSStatus()" class="btn btn-warning btn-small">
-                            📊 Ver Estado
-                        </button>
-                        
-                        <button onclick="testNotificationiOS()" class="btn btn-info btn-small">
-                            🔔 Test Notificación
-                        </button>
-                        
-                        <button onclick="resetPermissionsiOS()" class="btn btn-danger btn-small">
-                            🔄 Reset Permisos
                         </button>
                     </div>
                     <div class="user-info">
@@ -144,46 +125,5 @@
     </div>
 
     <script src="dashboard.js"></script>
-    <script>
-// Funciones de debug para iOS
-window.checkIOSStatus = async function() {
-    let msg = '=== ESTADO iOS ===\n';
-    msg += `Permisos: ${Notification.permission}\n`;
-    msg += `Service Worker: ${'serviceWorker' in navigator ? 'Sí' : 'No'}\n`;
-    msg += `Push Manager: ${'PushManager' in window ? 'Sí' : 'No'}\n`;
-    msg += `PWA Mode: ${window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches}\n`;
-    
-    try {
-        const reg = await navigator.serviceWorker.ready;
-        const sub = await reg.pushManager.getSubscription();
-        msg += `Suscripción: ${sub ? 'ACTIVA' : 'No hay'}`;
-    } catch (e) {
-        msg += `Error: ${e.message}`;
-    }
-    
-    alert(msg);
-}
-
-window.testNotificationiOS = async function() {
-    try {
-        if (Notification.permission === 'granted') {
-            new Notification('✅ Test iOS', {
-                body: 'Las notificaciones funcionan!',
-                icon: '/icons/icon-192x192.png'
-            });
-            alert('✅ Notificación enviada!');
-        } else {
-            const perm = await Notification.requestPermission();
-            alert(`Permiso: ${perm}`);
-        }
-    } catch (e) {
-        alert(`Error: ${e.message}`);
-    }
-}
-
-window.resetPermissionsiOS = function() {
-    alert('Para resetear permisos:\n\n1. Configuración iOS\n2. Safari\n3. Avanzado\n4. Datos de sitios web\n5. Busca y elimina polla-mundialista');
-}
-</script>
 </body>
 </html>
