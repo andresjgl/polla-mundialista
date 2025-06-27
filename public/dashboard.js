@@ -2169,6 +2169,33 @@ window.closePredictionsModal = function() {
     }
 }
 
+// Debug para PWA instalada
+if (window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches) {
+    console.log('🚀 Ejecutando como PWA instalada');
+    
+    // Crear botón de debug para iOS PWA
+    const debugBtn = document.createElement('button');
+    debugBtn.textContent = '🐛 Debug iOS PWA';
+    debugBtn.className = 'btn btn-warning btn-small';
+    debugBtn.onclick = async () => {
+        try {
+            alert(`Permisos: ${Notification.permission}`);
+            
+            if (Notification.permission === 'default') {
+                const perm = await Notification.requestPermission();
+                alert(`Nuevo permiso: ${perm}`);
+            }
+            
+            const reg = await navigator.serviceWorker.ready;
+            const sub = await reg.pushManager.getSubscription();
+            alert(`Suscripción: ${sub ? 'Activa' : 'No hay'}`);
+            
+        } catch (err) {
+            alert(`Error: ${err.message}`);
+        }
+    };
+    document.querySelector('.header-right').appendChild(debugBtn);
+}
 
 
 window.closeLeaderboardModal = function() {

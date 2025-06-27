@@ -4,9 +4,13 @@
   "description": "App de pronósticos de fútbol para la familia",
   "start_url": "/dashboard.html",
   "display": "standalone",
-  "background_color": "#1a1a2e",
+  "background_color": "#16213e",
   "theme_color": "#16213e",
   "orientation": "portrait",
+  "scope": "/",
+  "id": "/",
+  "categories": ["sports", "games"],
+  "prefer_related_applications": false,
   "icons": [
     {
       "src": "/icons/icon-72x72.png",
