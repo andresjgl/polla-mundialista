@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sin Conexión - Quiniela Familiar</title>
+    <link rel="stylesheet" href="/styles.css">
+    <style>
+        .offline-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            text-align: center;
+            padding: 2rem;
+        }
+        .offline-icon {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="offline-container">
+        <div class="offline-icon">📡</div>
+        <h1>Sin Conexión</h1>
+        <p>Parece que no tienes conexión a internet.</p>
+        <p>Por favor, verifica tu conexión y vuelve a intentarlo.</p>
+        <button class="btn btn-primary" onclick="window.location.reload()">
+            Reintentar
+        </button>
+    </div>
+</body>
+</html>

@@ -65,6 +65,36 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 // ===== SISTEMA DE PUSH NOTIFICATIONS =====
 
+// ===== DETECCIÓN DE CONEXIÓN =====
+window.addEventListener('online', () => {
+    console.log('✅ Conexión restaurada');
+    document.body.classList.remove('offline-mode');
+    showTemporaryMessage('✅ Conexión restaurada');
+    
+    // Recargar datos si es necesario
+    if (typeof loadUpcomingMatches === 'function') {
+        loadUpcomingMatches(currentPage, currentFilter);
+    }
+});
+
+window.addEventListener('offline', () => {
+    console.log('❌ Sin conexión');
+    document.body.classList.add('offline-mode');
+    showTemporaryMessage('⚠️ Sin conexión - Modo offline activado');
+});
+
+// Mostrar botón de instalación si está disponible
+document.addEventListener('DOMContentLoaded', () => {
+    // Tu código existente...
+    
+    // Mostrar botón de instalación si hay prompt disponible
+    if (window.deferredPrompt) {
+        const installButton = document.getElementById('installButton');
+        if (installButton) {
+            installButton.style.display = 'inline-block';
+        }
+    }
+});
 
 
 // Registrar Service Worker

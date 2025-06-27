@@ -3653,3 +3653,101 @@ main {
     border: 2px solid green !important;
     background: lightgreen !important;
 }
+
+
+/* ===== ESTILOS PARA PWA INSTALL PROMPT ===== */
+.install-prompt {
+    position: fixed;
+    bottom: -100px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: white;
+    padding: 16px 20px;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+    z-index: 2000;
+    transition: bottom 0.3s ease;
+    max-width: 90%;
+    width: 400px;
+}
+
+.install-prompt.show {
+    bottom: 20px;
+}
+
+.install-content {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.install-content span {
+    flex: 1;
+    color: #4a5568;
+    font-weight: 500;
+}
+
+.close-install {
+    background: none;
+    border: none;
+    font-size: 20px;
+    color: #718096;
+    cursor: pointer;
+    padding: 4px;
+    margin-left: 8px;
+}
+
+.close-install:hover {
+    color: #4a5568;
+}
+
+/* Badge PWA para usuarios que ya instalaron */
+.pwa-badge {
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    background: #48bb78;
+    color: white;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    z-index: 100;
+    display: none;
+}
+
+.pwa-mode .pwa-badge {
+    display: block;
+}
+
+/* Mejorar la experiencia offline */
+.offline-banner {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    background: #f56565;
+    color: white;
+    padding: 8px;
+    text-align: center;
+    z-index: 2000;
+    font-weight: 500;
+    display: none;
+}
+
+.offline-mode .offline-banner {
+    display: block;
+}
+
+/* Responsive para install prompt */
+@media (max-width: 600px) {
+    .install-prompt {
+        width: calc(100% - 40px);
+        left: 20px;
+        transform: none;
+    }
+    
+    .install-content {
+        font-size: 14px;
+    }
+}

@@ -232,6 +232,93 @@ notificationStyles.textContent = `
 `;
 document.head.appendChild(notificationStyles);
 
+// ===== DETECCIÓN E INSTALACIÓN DE PWA =====
+
+let deferredPrompt;
+let isInstalled = false;
+
+// Verificar si ya está instalada
+if (window.matchMedia('(display-mode: standalone)').matches || 
+    window.navigator.standalone === true) {
+    console.log('🚀 App ejecutándose como PWA');
+    isInstalled = true;
+}
+
+// Detectar evento de instalación
+window.addEventListener('beforeinstallprompt', (e) => {
+    console.log('📱 App es instalable');
+    e.preventDefault();
+    deferredPrompt = e;
+    
+    // Mostrar botón de instalación después de 30 segundos
+    setTimeout(() => {
+        if (!isInstalled) {
+            showInstallPrompt();
+        }
+    }, 30000);
+});
+
+function showInstallPrompt() {
+    const installDiv = document.createElement('div');
+    installDiv.className = 'install-prompt';
+    installDiv.innerHTML = `
+        <div class="install-content">
+            <span>📱 ¡Instala la app en tu dispositivo!</span>
+            <button class="btn btn-primary btn-small" onclick="installPWA()">
+                Instalar
+            </button>
+            <button class="close-install" onclick="dismissInstallPrompt()">
+                ✕
+            </button>
+        </div>
+    `;
+    document.body.appendChild(installDiv);
+    
+    // Animación de entrada
+    setTimeout(() => {
+        installDiv.classList.add('show');
+    }, 100);
+}
+
+window.installPWA = async function() {
+    if (!deferredPrompt) {
+        console.log('No hay prompt de instalación disponible');
+        return;
+    }
+    
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    
+    console.log(`Usuario ${outcome === 'accepted' ? 'aceptó' : 'rechazó'} la instalación`);
+    
+    if (outcome === 'accepted') {
+        isInstalled = true;
+        // Registrar evento en analytics si tienes
+    }
+    
+    deferredPrompt = null;
+    dismissInstallPrompt();
+}
+
+window.dismissInstallPrompt = function() {
+    const prompt = document.querySelector('.install-prompt');
+    if (prompt) {
+        prompt.classList.remove('show');
+        setTimeout(() => {
+            prompt.remove();
+        }, 300);
+    }
+}
+
+// Detectar cuando se instala
+window.addEventListener('appinstalled', () => {
+    console.log('✅ PWA instalada');
+    isInstalled = true;
+    deferredPrompt = null;
+    dismissInstallPrompt();
+});
+
+
 // Exportar funciones para uso global
 window.goToRegister = goToRegister;
 window.goToLogin = goToLogin;
