@@ -171,11 +171,20 @@ router.post('/tournaments', authenticateToken, requireAdmin, async (req, res) =>
 });
 
 
-// PUT /api/admin/tournaments/:id - Actualizar torneo (NUEVA RUTA)
+// PUT /api/admin/tournaments/:id - Actualizar torneo (ACTUALIZADA)
 router.put('/tournaments/:id', authenticateToken, requireAdmin, async (req, res) => {
     try {
         const { id } = req.params;
-        const { name, start_date, end_date, description, rules } = req.body;
+        const { 
+            name, 
+            start_date, 
+            end_date, 
+            description, 
+            rules,
+            special_predictions_deadline,
+            champion_points,
+            top_scorer_points
+        } = req.body;
 
         if (!name || !start_date || !end_date) {
             return res.status(400).json({ 
@@ -187,9 +196,20 @@ router.put('/tournaments/:id', authenticateToken, requireAdmin, async (req, res)
 
         db.run(`
             UPDATE tournaments 
-            SET name = ?, start_date = ?, end_date = ?, description = ?, rules = ?
+            SET name = ?, start_date = ?, end_date = ?, description = ?, rules = ?,
+                special_predictions_deadline = ?, champion_points = ?, top_scorer_points = ?
             WHERE id = ?
-        `, [name, start_date, end_date, description || '', rules || '', id], function(err) {
+        `, [
+            name, 
+            start_date, 
+            end_date, 
+            description || '', 
+            rules || '', 
+            special_predictions_deadline,
+            champion_points || 15,
+            top_scorer_points || 10,
+            id
+        ], function(err) {
             if (err) {
                 console.error('Error actualizando torneo:', err);
                 return res.status(500).json({ 
@@ -201,7 +221,7 @@ router.put('/tournaments/:id', authenticateToken, requireAdmin, async (req, res)
                 return res.status(404).json({ error: 'Torneo no encontrado' });
             }
 
-            console.log(`✅ Torneo ${id} actualizado con reglas`);
+            console.log(`✅ Torneo ${id} actualizado`);
 
             res.json({
                 message: 'Torneo actualizado exitosamente',
@@ -212,7 +232,9 @@ router.put('/tournaments/:id', authenticateToken, requireAdmin, async (req, res)
                     end_date,
                     description: description || '',
                     rules: rules || '',
-                    status: 'active' // Asumiendo que se actualiza cuando está activo
+                    special_predictions_deadline,
+                    champion_points: champion_points || 15,
+                    top_scorer_points: top_scorer_points || 10
                 }
             });
         });

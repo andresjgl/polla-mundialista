@@ -308,8 +308,11 @@ function displayTournaments(tournaments) {
                         Desactivar
                     </button>`
         }
+                <button class="btn btn-primary btn-small" onclick="editActiveTournament(${tournament.id})">
+                    ✏️ Editar Torneo
+                </button>
                 <button class="btn btn-secondary btn-small" onclick="manageTournamentPhases(${tournament.id}, '${tournament.name}')">
-                    Gestionar Fases
+                    ⚙️ Gestionar Fases
                 </button>
                 <button class="btn btn-secondary btn-small" onclick="viewTournamentDetails(${tournament.id})">
                     Ver Detalles
@@ -526,6 +529,162 @@ async function createTournament(event) {
         alert('Error de conexión');
     }
 }
+
+// Función para editar el torneo activo
+async function editActiveTournament(tournamentId) {
+    try {
+        // Primero obtener los datos actuales del torneo
+        const token = localStorage.getItem('token');
+        const response = await fetch(`/api/admin/active-tournament`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (!response.ok) throw new Error('Error obteniendo torneo');
+        
+        const data = await response.json();
+        const tournament = data.active_tournament;
+        
+        showEditTournamentForm(tournament);
+        
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Error cargando datos del torneo');
+    }
+}
+
+// Mostrar formulario de edición
+function showEditTournamentForm(tournament) {
+    const modal = document.createElement('div');
+    modal.className = 'prediction-modal';
+    modal.innerHTML = `
+        <div class="modal-content large">
+            <div class="modal-header">
+                <h3>✏️ Editar Torneo: ${tournament.name}</h3>
+                <button class="close-modal" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="editTournamentForm" onsubmit="updateTournament(event, ${tournament.id})">
+                    <div class="form-group">
+                        <label for="editTournamentName">Nombre del Torneo</label>
+                        <input type="text" id="editTournamentName" name="name" required 
+                               value="${tournament.name}">
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="editStartDate">Fecha de Inicio</label>
+                            <input type="date" id="editStartDate" name="start_date" required
+                                   value="${tournament.start_date ? tournament.start_date.split('T')[0] : ''}">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="editEndDate">Fecha de Fin</label>
+                            <input type="date" id="editEndDate" name="end_date" required
+                                   value="${tournament.end_date ? tournament.end_date.split('T')[0] : ''}">
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="editDescription">Descripción</label>
+                        <textarea id="editDescription" name="description" rows="3">${tournament.description || ''}</textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="editTournamentRules">Reglas del Torneo</label>
+                        <textarea id="editTournamentRules" name="rules" rows="8">${tournament.rules || ''}</textarea>
+                    </div>
+                    
+                    <!-- Sección de Pronósticos Especiales -->
+                    <div class="special-predictions-section">
+                        <h4>⚡ Pronósticos Especiales</h4>
+                        
+                        <div class="form-group">
+                            <label for="editPredictionDeadline">Fecha límite para pronósticos</label>
+                            <input type="datetime-local" id="editPredictionDeadline" 
+                                   name="special_predictions_deadline" required
+                                   value="${tournament.special_predictions_deadline ? 
+                                           new Date(tournament.special_predictions_deadline).toISOString().slice(0, 16) : 
+                                           ''}">
+                            <small>Fecha actual: ${tournament.special_predictions_deadline ? 
+                                    new Date(tournament.special_predictions_deadline).toLocaleString('es-CO') : 
+                                    'No configurada'}</small>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="editChampionPoints">Puntos por acertar Campeón</label>
+                                <input type="number" id="editChampionPoints" name="champion_points" 
+                                       min="0" max="100" value="${tournament.champion_points || 15}" required>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="editScorerPoints">Puntos por acertar Goleador</label>
+                                <input type="number" id="editScorerPoints" name="top_scorer_points" 
+                                       min="0" max="100" value="${tournament.top_scorer_points || 10}" required>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="modal-actions">
+                        <button type="button" class="btn btn-secondary" onclick="closeModal()">
+                            Cancelar
+                        </button>
+                        <button type="submit" class="btn btn-primary">
+                            Actualizar Torneo
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+}
+
+// Actualizar torneo
+async function updateTournament(event, tournamentId) {
+    event.preventDefault();
+
+    const form = event.target;
+    const formData = new FormData(form);
+
+    const tournamentData = {
+        name: formData.get('name'),
+        start_date: formData.get('start_date'),
+        end_date: formData.get('end_date'),
+        description: formData.get('description'),
+        rules: formData.get('rules'),
+        special_predictions_deadline: formData.get('special_predictions_deadline'),
+        champion_points: parseInt(formData.get('champion_points')),
+        top_scorer_points: parseInt(formData.get('top_scorer_points'))
+    };
+
+    try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`/api/admin/tournaments/${tournamentId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify(tournamentData)
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            alert('¡Torneo actualizado exitosamente!');
+            closeModal();
+            await loadActiveTournament(); // Recargar info
+        } else {
+            alert('Error: ' + result.error);
+        }
+    } catch (error) {
+        console.error('Error actualizando torneo:', error);
+        alert('Error de conexión');
+    }
+}
+
 
 async function createStandardPhases(tournamentId) {
     const standardPhases = [
