@@ -3852,7 +3852,7 @@ main {
 }
 
 .special-predictions-section h2 {
-    color: white;
+    color: #4a5568;
     margin-bottom: 20px;
 }
 
@@ -3862,6 +3862,7 @@ main {
     backdrop-filter: blur(10px);
     border: 1px solid rgba(255, 255, 255, 0.3);
     border-radius: 12px;
+    color: #4a5568;
     padding: 16px;
     margin-bottom: 24px;
     display: flex;
@@ -3967,15 +3968,6 @@ main {
     }
 }
 
-.prediction-card {
-    background: rgba(255, 255, 255, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: 12px;
-    padding: 20px;
-    display: flex;
-    gap: 16px;
-    align-items: center;
-}
 
 .prediction-icon {
     font-size: 48px;
@@ -4023,6 +4015,7 @@ main {
     background: rgba(251, 191, 36, 0.2);
     border: 1px solid #fbbf24;
     padding: 12px;
+    color: #4a5568;
     border-radius: 8px;
     text-align: center;
     margin-top: 16px;
