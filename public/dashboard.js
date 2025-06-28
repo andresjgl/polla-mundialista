@@ -41,8 +41,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     checkAccountStatus(user);
 
-     // ✨ INICIALIZAR PUSH NOTIFICATIONS
-    await registerServiceWorker();
 
     // Solo si la cuenta está activa, cargamos el resto.
     if (user.is_active) {

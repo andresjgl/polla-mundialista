@@ -302,7 +302,4 @@ module.exports = router;
 module.exports.createNotification = createNotification;
 module.exports.notifyMatchResult = notifyMatchResult;
 module.exports.checkUpcomingMatches = checkUpcomingMatches;
-module.exports.sendPushNotification = sendPushNotification;
-module.exports.sendPushNotificationToUsers = sendPushNotificationToUsers;
-module.exports.notifyMatchResultWithPush = notifyMatchResultWithPush;
 
