@@ -15,6 +15,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 const predictionsRoutes = require('./routes/predictions');
+const specialPredictionsRoutes = require('./routes/specialPredictions');
 const leaderboardRoutes = require('./routes/leaderboard');
 
 const notificationsRoutes = require('./routes/notifications');
@@ -31,6 +32,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/api/auth', authRoutes);
 app.use('/api/matches', matchRoutes);
 app.use('/api/predictions', predictionsRoutes);
+app.use('/api/predictions', specialPredictionsRoutes);
 app.use('/api/leaderboard', leaderboardRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/notifications', notificationsRoutes);

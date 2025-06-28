@@ -3841,3 +3841,226 @@ main {
         max-width: none;
     }
 }
+
+/* ===== SECCIÓN DE PRONÓSTICOS ESPECIALES ===== */
+.special-predictions-section {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 24px;
+}
+
+.special-predictions-section h2 {
+    color: white;
+    margin-bottom: 20px;
+}
+
+/* Banner de fecha límite */
+.deadline-banner {
+    background: rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 24px;
+    display: flex;
+    gap: 16px;
+    align-items: center;
+}
+
+.deadline-banner.active {
+    background: rgba(72, 187, 120, 0.2);
+    border-color: rgba(72, 187, 120, 0.5);
+}
+
+.deadline-banner.expired {
+    background: rgba(245, 101, 101, 0.2);
+    border-color: rgba(245, 101, 101, 0.5);
+}
+
+.deadline-icon {
+    font-size: 48px;
+}
+
+.deadline-content {
+    flex: 1;
+}
+
+.deadline-title {
+    font-weight: bold;
+    font-size: 18px;
+    margin-bottom: 4px;
+}
+
+.time-remaining {
+    color: #fbbf24;
+    font-weight: bold;
+}
+
+/* Formulario de pronósticos */
+.special-predictions-form {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 24px;
+}
+
+.special-predictions-form.urgent {
+    animation: pulse-border 2s infinite;
+    border: 2px solid #fbbf24;
+}
+
+.form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    margin-bottom: 24px;
+}
+
+@media (max-width: 768px) {
+    .form-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.special-predictions-form select,
+.special-predictions-form input {
+    background: rgba(255, 255, 255, 0.9);
+    color: #1a202c;
+    border: 2px solid transparent;
+    padding: 12px;
+    border-radius: 8px;
+    width: 100%;
+    font-size: 16px;
+}
+
+.special-predictions-form select:focus,
+.special-predictions-form input:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
+.form-help {
+    display: block;
+    margin-top: 4px;
+    font-size: 14px;
+    opacity: 0.9;
+}
+
+/* Cards de predicciones hechas */
+.predictions-made {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 24px;
+}
+
+.prediction-cards {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-top: 20px;
+}
+
+@media (max-width: 768px) {
+    .prediction-cards {
+        grid-template-columns: 1fr;
+    }
+}
+
+.prediction-card {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 12px;
+    padding: 20px;
+    display: flex;
+    gap: 16px;
+    align-items: center;
+}
+
+.prediction-icon {
+    font-size: 48px;
+}
+
+.prediction-label {
+    font-size: 14px;
+    opacity: 0.8;
+    margin-bottom: 4px;
+}
+
+.prediction-value {
+    font-size: 20px;
+    font-weight: bold;
+    margin-bottom: 4px;
+}
+
+.prediction-points {
+    font-size: 14px;
+    color: #fbbf24;
+    font-weight: 600;
+}
+
+.prediction-date {
+    text-align: center;
+    margin-top: 16px;
+    opacity: 0.8;
+}
+
+/* Warning de no predicción */
+.no-prediction-warning {
+    text-align: center;
+    padding: 40px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+}
+
+.warning-icon {
+    font-size: 64px;
+    margin-bottom: 16px;
+}
+
+/* Urgency warning */
+.urgency-warning {
+    background: rgba(251, 191, 36, 0.2);
+    border: 1px solid #fbbf24;
+    padding: 12px;
+    border-radius: 8px;
+    text-align: center;
+    margin-top: 16px;
+    font-weight: 600;
+}
+
+/* Estilos adicionales para el formulario de crear torneo */
+.special-predictions-section {
+    margin-top: 24px;
+    padding: 20px;
+    background: #f8fafc;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+}
+
+.special-predictions-section h4 {
+    color: #4a5568;
+    margin-bottom: 16px;
+}
+
+.deadline-suggestions {
+    margin: 12px 0;
+}
+
+.deadline-suggestions label {
+    display: block;
+    margin-bottom: 8px;
+    color: #718096;
+    font-size: 14px;
+}
+
+.deadline-suggestions button {
+    margin-right: 8px;
+    margin-bottom: 8px;
+}
+
+/* Botón grande para enviar */
+.btn-large {
+    padding: 16px 32px;
+    font-size: 18px;
+}

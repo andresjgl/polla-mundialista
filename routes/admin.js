@@ -100,24 +100,43 @@ router.get('/tournaments', authenticateToken, requireAdmin, (req, res) => {
 });
 
 
-// POST /api/admin/tournaments - Crear nuevo torneo
+// POST /api/admin/tournaments - Crear nuevo torneo ACTUALIZADO
 router.post('/tournaments', authenticateToken, requireAdmin, async (req, res) => {
     try {
-        const { name, start_date, end_date, description, rules } = req.body
+        const { 
+            name, 
+            start_date, 
+            end_date, 
+            description, 
+            rules,
+            special_predictions_deadline,
+            champion_points,
+            top_scorer_points
+        } = req.body;
 
-        if (!name || !start_date || !end_date) {
+        if (!name || !start_date || !end_date || !special_predictions_deadline) {
             return res.status(400).json({ 
-                error: 'Nombre, fecha de inicio y fecha de fin son requeridos' 
+                error: 'Nombre, fechas y fecha límite de pronósticos son requeridos' 
             });
         }
 
         const { db } = require('../database');
 
-        // Verificar primero si las columnas existen
         db.run(`
-            INSERT INTO tournaments (name, start_date, end_date, status)
-            VALUES (?, ?, ?, 'upcoming')
-        `, [name, start_date, end_date, description || '', rules || ''], function(err) {
+            INSERT INTO tournaments 
+            (name, start_date, end_date, description, rules, 
+             special_predictions_deadline, champion_points, top_scorer_points, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'upcoming')
+        `, [
+            name, 
+            start_date, 
+            end_date, 
+            description || '', 
+            rules || '',
+            special_predictions_deadline,
+            champion_points || 15,
+            top_scorer_points || 10
+        ], function(err) {
             if (err) {
                 console.error('Error creando torneo:', err);
                 return res.status(500).json({ 
@@ -136,6 +155,9 @@ router.post('/tournaments', authenticateToken, requireAdmin, async (req, res) =>
                     end_date,
                     description: description || '',
                     rules: rules || '',
+                    special_predictions_deadline,
+                    champion_points: champion_points || 15,
+                    top_scorer_points: top_scorer_points || 10,
                     status: 'upcoming'
                 }
             });
@@ -147,6 +169,7 @@ router.post('/tournaments', authenticateToken, requireAdmin, async (req, res) =>
         });
     }
 });
+
 
 // PUT /api/admin/tournaments/:id - Actualizar torneo (NUEVA RUTA)
 router.put('/tournaments/:id', authenticateToken, requireAdmin, async (req, res) => {

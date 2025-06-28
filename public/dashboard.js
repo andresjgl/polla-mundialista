@@ -50,6 +50,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             await loadLeaderboard();
             await loadUpcomingMatches();
             await loadUserPredictions(1, 'all');
+            await loadSpecialPredictions();
         }
     }
 
@@ -398,6 +399,187 @@ function showTemporaryMessage(message) {
 function startNotificationsPolling() {
     // Verificar cada 2 minutos
     setInterval(loadNotifications, 2 * 60 * 1000);
+}
+
+// ===== SISTEMA DE PRONÓSTICOS ESPECIALES =====
+
+// Cargar pronósticos especiales
+async function loadSpecialPredictions() {
+    try {
+        const response = await fetchWithAuth('/api/predictions/special');
+        if (!response || !response.ok) {
+            console.error('Error cargando pronósticos especiales');
+            return;
+        }
+        
+        const data = await response.json();
+        displaySpecialPredictions(data);
+        
+    } catch (error) {
+        console.error('Error cargando pronósticos especiales:', error);
+    }
+}
+
+// Mostrar pronósticos especiales
+function displaySpecialPredictions(data) {
+    const container = document.getElementById('tournamentPredictionsContent');
+    const { tournament, teams, userPrediction, canPredict, timeRemaining } = data;
+    
+    if (!tournament) {
+        container.innerHTML = '<div class="no-data"><p>No hay torneo activo</p></div>';
+        return;
+    }
+    
+    // Formatear fecha límite
+    const deadlineDate = new Date(tournament.special_predictions_deadline);
+    const formattedDeadline = deadlineDate.toLocaleString('es-CO', {
+        dateStyle: 'long',
+        timeStyle: 'short',
+        timeZone: 'America/Bogota'
+    });
+    
+    // Mostrar información de fecha límite
+    const deadlineInfo = `
+        <div class="deadline-banner ${canPredict ? 'active' : 'expired'}">
+            <div class="deadline-icon">⏰</div>
+            <div class="deadline-content">
+                <div class="deadline-title">
+                    ${canPredict ? 'Fecha límite para pronósticos' : 'Plazo vencido'}
+                </div>
+                <div class="deadline-details">
+                    ${canPredict ? 
+                        `<strong>${formattedDeadline}</strong><br>
+                         <small>Tiempo restante: <span class="time-remaining">${timeRemaining}</span></small>` : 
+                        `El plazo venció el ${formattedDeadline}`
+                    }
+                </div>
+            </div>
+        </div>
+    `;
+    
+    if (userPrediction) {
+        // Usuario ya hizo sus pronósticos
+        container.innerHTML = `
+            ${deadlineInfo}
+            <div class="predictions-made">
+                <h3>✅ Tus pronósticos están listos</h3>
+                <div class="prediction-cards">
+                    <div class="prediction-card">
+                        <div class="prediction-icon">🏆</div>
+                        <div class="prediction-info">
+                            <div class="prediction-label">Campeón</div>
+                            <div class="prediction-value">${userPrediction.champion_team_name || 'No seleccionado'}</div>
+                            <div class="prediction-points">${tournament.champion_points} puntos</div>
+                        </div>
+                    </div>
+                    <div class="prediction-card">
+                        <div class="prediction-icon">⚽</div>
+                        <div class="prediction-info">
+                            <div class="prediction-label">Goleador</div>
+                            <div class="prediction-value">${userPrediction.top_scorer_name || 'No seleccionado'}</div>
+                            <div class="prediction-points">${tournament.top_scorer_points} puntos</div>
+                        </div>
+                    </div>
+                </div>
+                ${userPrediction.created_at ? 
+                    `<div class="prediction-date">
+                        <small>Pronóstico realizado el ${new Date(userPrediction.created_at).toLocaleString('es-CO')}</small>
+                    </div>` 
+                    : ''
+                }
+            </div>
+        `;
+    } else if (canPredict) {
+        // Mostrar formulario para hacer pronósticos
+        const urgencyClass = timeRemaining && (timeRemaining.includes('hora') || timeRemaining.includes('minuto')) ? 'urgent' : '';
+        
+        container.innerHTML = `
+            ${deadlineInfo}
+            <form id="specialPredictionsForm" class="special-predictions-form ${urgencyClass}" onsubmit="submitSpecialPredictions(event)">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>🏆 ¿Quién será el campeón?</label>
+                        <select name="champion_team_id" required>
+                            <option value="">Selecciona un equipo</option>
+                            ${teams.map(team => `
+                                <option value="${team.id}">${team.name} ${team.country ? `(${team.country})` : ''}</option>
+                            `).join('')}
+                        </select>
+                        <small class="form-help">${tournament.champion_points} puntos si aciertas</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>⚽ ¿Quién será el goleador?</label>
+                        <input type="text" name="top_scorer_name" 
+                               placeholder="Nombre completo del jugador" 
+                               maxlength="100" required
+                               class="scorer-input">
+                        <small class="form-help">${tournament.top_scorer_points} puntos si aciertas</small>
+                    </div>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary btn-large">
+                        💾 Guardar Pronósticos
+                    </button>
+                </div>
+                
+                ${urgencyClass ? 
+                    '<div class="urgency-warning">⚠️ ¡Date prisa! Queda poco tiempo</div>' : 
+                    ''
+                }
+            </form>
+        `;
+    } else {
+        // No hizo pronóstico y ya pasó la fecha
+        container.innerHTML = `
+            ${deadlineInfo}
+            <div class="no-prediction-warning">
+                <div class="warning-icon">😔</div>
+                <h3>No realizaste tus pronósticos a tiempo</h3>
+                <p>Ya no puedes participar por estos ${tournament.champion_points + tournament.top_scorer_points} puntos extra</p>
+            </div>
+        `;
+    }
+}
+
+// Enviar pronósticos especiales
+async function submitSpecialPredictions(event) {
+    event.preventDefault();
+    
+    const form = event.target;
+    const submitButton = form.querySelector('button[type="submit"]');
+    submitButton.disabled = true;
+    submitButton.textContent = 'Guardando...';
+    
+    const formData = new FormData(form);
+    const data = {
+        champion_team_id: parseInt(formData.get('champion_team_id')),
+        top_scorer_name: formData.get('top_scorer_name').trim()
+    };
+    
+    try {
+        const response = await fetchWithAuth('/api/predictions/special', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        
+        if (response && response.ok) {
+            showTemporaryMessage('✅ ¡Pronósticos guardados exitosamente!');
+            await loadSpecialPredictions(); // Recargar
+        } else {
+            const error = await response.json();
+            alert('Error: ' + (error.error || 'Error desconocido'));
+            submitButton.disabled = false;
+            submitButton.textContent = '💾 Guardar Pronósticos';
+        }
+    } catch (error) {
+        console.error('Error guardando pronósticos:', error);
+        alert('Error de conexión');
+        submitButton.disabled = false;
+        submitButton.textContent = '💾 Guardar Pronósticos';
+    }
 }
 
 

@@ -366,7 +366,7 @@ function showCreateTournamentForm() {
     const modal = document.createElement('div');
     modal.className = 'prediction-modal';
     modal.innerHTML = `
-        <div class="modal-content">
+        <div class="modal-content large">
             <div class="modal-header">
                 <h3>🏆 Crear Nuevo Torneo</h3>
                 <button class="close-modal" onclick="closeModal()">&times;</button>
@@ -379,14 +379,16 @@ function showCreateTournamentForm() {
                                placeholder="ej: Mundial de Clubes 2025">
                     </div>
                     
-                    <div class="form-group">
-                        <label for="startDate">Fecha de Inicio</label>
-                        <input type="date" id="startDate" name="start_date" required>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="endDate">Fecha de Fin</label>
-                        <input type="date" id="endDate" name="end_date" required>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="startDate">Fecha de Inicio</label>
+                            <input type="date" id="startDate" name="start_date" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="endDate">Fecha de Fin</label>
+                            <input type="date" id="endDate" name="end_date" required>
+                        </div>
                     </div>
                     
                     <div class="form-group">
@@ -395,18 +397,48 @@ function showCreateTournamentForm() {
                                 placeholder="Descripción del torneo..."></textarea>
                     </div>
 
-                    <!-- ✨ NUEVO CAMPO DE REGLAS -->
                     <div class="form-group">
                         <label for="tournamentRules">Reglas del Torneo</label>
                         <textarea id="tournamentRules" name="rules" rows="8"
-                                placeholder="Escribe aquí las reglas del torneo...
-                                Ejemplo:
-                                • Puntuación por resultado correcto: 1 punto
-                                • Puntuación por marcador exacto: 3 puntos  
-                                • Fases eliminatorias tienen multiplicador
-                                • No se permiten empates en eliminatorias
-                                • Los puntos se calculan automáticamente"></textarea>
+                                placeholder="Escribe aquí las reglas del torneo..."></textarea>
                         <small>Puedes usar saltos de línea y viñetas (•) para formatear las reglas</small>
+                    </div>
+                    
+                    <!-- NUEVO: Sección de Pronósticos Especiales -->
+                    <div class="special-predictions-section">
+                        <h4>⚡ Pronósticos Especiales</h4>
+                        
+                        <div class="form-group">
+                            <label for="predictionDeadline">Fecha límite para pronósticos de Campeón/Goleador</label>
+                            <input type="datetime-local" id="predictionDeadline" name="special_predictions_deadline" required>
+                            <small>Los usuarios no podrán hacer estos pronósticos después de esta fecha</small>
+                        </div>
+                        
+                        <div class="deadline-suggestions">
+                            <label>Sugerencias rápidas:</label>
+                            <button type="button" class="btn btn-small btn-secondary" onclick="setDeadlineBeforeFirstMatch()">
+                                📅 Día del 1er partido
+                            </button>
+                            <button type="button" class="btn btn-small btn-secondary" onclick="setDeadlineCustomDays(7)">
+                                📅 7 días después
+                            </button>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="championPoints">Puntos por acertar Campeón</label>
+                                <input type="number" id="championPoints" name="champion_points" 
+                                       min="0" max="100" value="15" required>
+                                <small>Puntos extra si acierta el equipo campeón</small>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="scorerPoints">Puntos por acertar Goleador</label>
+                                <input type="number" id="scorerPoints" name="top_scorer_points" 
+                                       min="0" max="100" value="10" required>
+                                <small>Puntos extra si acierta el goleador del torneo</small>
+                            </div>
+                        </div>
                     </div>
                     
                     <div class="modal-actions">
@@ -425,6 +457,29 @@ function showCreateTournamentForm() {
     document.body.appendChild(modal);
 }
 
+// Agregar estas funciones después de showCreateTournamentForm
+function setDeadlineBeforeFirstMatch() {
+    const startDate = document.getElementById('startDate').value;
+    if (startDate) {
+        const deadline = new Date(startDate);
+        deadline.setHours(23, 59, 59);
+        document.getElementById('predictionDeadline').value = 
+            deadline.toISOString().slice(0, 16);
+    }
+}
+
+function setDeadlineCustomDays(days) {
+    const startDate = document.getElementById('startDate').value;
+    if (startDate) {
+        const deadline = new Date(startDate);
+        deadline.setDate(deadline.getDate() + days);
+        deadline.setHours(23, 59, 59);
+        document.getElementById('predictionDeadline').value = 
+            deadline.toISOString().slice(0, 16);
+    }
+}
+
+// Actualizar la función createTournament
 async function createTournament(event) {
     event.preventDefault();
 
@@ -436,7 +491,10 @@ async function createTournament(event) {
         start_date: formData.get('start_date'),
         end_date: formData.get('end_date'),
         description: formData.get('description'),
-        rules: formData.get('rules') 
+        rules: formData.get('rules'),
+        special_predictions_deadline: formData.get('special_predictions_deadline'),
+        champion_points: parseInt(formData.get('champion_points')),
+        top_scorer_points: parseInt(formData.get('top_scorer_points'))
     };
 
     try {
@@ -457,7 +515,6 @@ async function createTournament(event) {
             closeModal();
             await loadTournaments();
 
-            // Preguntar si quiere crear fases automáticamente
             if (confirm('¿Quieres crear las fases estándar del torneo? (Grupos, Octavos, Cuartos, etc.)')) {
                 await createStandardPhases(result.tournament.id);
             }

@@ -300,7 +300,7 @@ function initializeDatabase() {
 
     executeQuery('CREATE TABLE teams', createTeamsQuery);
 
-    // 3. Tabla de torneos
+    // 3. Tabla de torneos - ACTUALIZADA
     const createTournamentsQuery = isProduction ?
         `CREATE TABLE IF NOT EXISTS tournaments (
             id SERIAL PRIMARY KEY,
@@ -309,6 +309,10 @@ function initializeDatabase() {
             end_date TIMESTAMP,
             status TEXT DEFAULT 'upcoming',
             description TEXT DEFAULT '',
+            rules TEXT DEFAULT '',
+            special_predictions_deadline TIMESTAMP,
+            champion_points INTEGER DEFAULT 15,
+            top_scorer_points INTEGER DEFAULT 10,
             created_at TIMESTAMP DEFAULT NOW(),
             updated_at TIMESTAMP DEFAULT NOW()
         )` :
@@ -319,11 +323,49 @@ function initializeDatabase() {
             end_date DATETIME,
             status TEXT DEFAULT 'upcoming',
             description TEXT DEFAULT '',
+            rules TEXT DEFAULT '',
+            special_predictions_deadline DATETIME,
+            champion_points INTEGER DEFAULT 15,
+            top_scorer_points INTEGER DEFAULT 10,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )`;
 
+
     executeQuery('CREATE TABLE tournaments', createTournamentsQuery);
+
+    // Nueva tabla para predicciones especiales
+    const createTournamentPredictionsQuery = isProduction ?
+        `CREATE TABLE IF NOT EXISTS tournament_predictions (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER REFERENCES users(id),
+            tournament_id INTEGER REFERENCES tournaments(id),
+            champion_team_id INTEGER REFERENCES teams(id),
+            top_scorer_name VARCHAR(255),
+            champion_points_earned INTEGER DEFAULT 0,
+            scorer_points_earned INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT NOW(),
+            updated_at TIMESTAMP DEFAULT NOW(),
+            UNIQUE(user_id, tournament_id)
+        )` :
+        `CREATE TABLE IF NOT EXISTS tournament_predictions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            tournament_id INTEGER,
+            champion_team_id INTEGER,
+            top_scorer_name TEXT,
+            champion_points_earned INTEGER DEFAULT 0,
+            scorer_points_earned INTEGER DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(user_id, tournament_id),
+            FOREIGN KEY (user_id) REFERENCES users(id),
+            FOREIGN KEY (tournament_id) REFERENCES tournaments(id),
+            FOREIGN KEY (champion_team_id) REFERENCES teams(id)
+        )`;
+
+    executeQuery('CREATE TABLE tournament_predictions', createTournamentPredictionsQuery);
+
 
     // 4. Tabla de fases - SIN FOREIGN KEYS para evitar problemas
     const createPhasesQuery = isProduction ?
