@@ -463,7 +463,7 @@ main {
 
 .points-number, .position-number {
     display: block;
-    font-size: 1.25rem;
+    font-size: 3rem;
     font-weight: bold;
     color: #001450;
 }
@@ -2743,6 +2743,9 @@ main {
     }
 }
 
+.position-display .position-number {
+    font-size: 3rem;
+}
 
 /* ===== LOGOS DE EQUIPOS EN TARJETAS ===== */
 .teams {
@@ -3003,7 +3006,7 @@ main {
 .position-medal {
     background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
     color: white;
-    padding: 0.25rem 0.5rem;
+    padding: 0.25rem;
     border-radius: 50%;
     font-weight: 700;
     font-size: 0.875rem;
@@ -3012,12 +3015,13 @@ main {
     display: flex;
     align-items: center;
     justify-content: center;
-    margin: 0 1rem;
+    margin: 0 0.5rem;
 }
 
 .position-number {
     color: #6b7280;
     font-weight: 500;
+    font-size: 1.25rem;
 }
 
 .col-user {
@@ -3114,7 +3118,7 @@ main {
     
     .table-header,
     .table-row {
-        grid-template-columns: 30px 1fr 60px;
+        grid-template-columns: 45px 150px 60px;
         gap: 0.25rem;
     }
     
