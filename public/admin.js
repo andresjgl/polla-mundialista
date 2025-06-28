@@ -2468,6 +2468,7 @@ async function loadActiveTournament() {
 }
 
 // Mostrar torneo activo con estadísticas
+// Mostrar torneo activo con estadísticas
 function displayActiveTournament(tournament) {
     console.log('🎯 Mostrando torneo activo:', tournament);
     
@@ -2496,6 +2497,9 @@ function displayActiveTournament(tournament) {
             </div>
             
             <div class="tournament-actions">
+                <button class="btn btn-primary btn-small" onclick="editActiveTournament(${tournament.id})">
+                    ✏️ Editar Torneo
+                </button>
                 <button class="btn btn-secondary btn-small" onclick="setTournamentStatus(${tournament.id}, 'upcoming')">
                     Desactivar
                 </button>
@@ -2512,6 +2516,7 @@ function displayActiveTournament(tournament) {
     container.innerHTML = tournamentHTML;
     console.log('✅ Torneo activo mostrado con estadísticas correctas');
 }
+
 
 // ============= GESTIÓN DE USUARIOS =============
 
